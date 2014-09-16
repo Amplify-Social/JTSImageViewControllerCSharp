@@ -45,6 +45,7 @@
     <Compile Include="UIApplicationExtension.cs" />
     <Compile Include="JTSImageInfo.cs" />
     <Compile Include="UIImageEffects.cs" />
+    <Compile Include="IJTSImageViewControllerDismissalDelegate.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath)\Xamarin\iOS\Xamarin.MonoTouch.CSharp.targets" />
 </Project>
