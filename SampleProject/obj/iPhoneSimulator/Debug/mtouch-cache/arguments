@@ -1,0 +1,29 @@
+# Version: 8.0.0.36 (921d22f)
+# [first argument, ignore] # /Users/namkim/Projects/JTSImageViewController/SampleProject/bin/iPhoneSimulator/Debug/mtouch.exe
+/Library/Frameworks/Xamarin.iOS.framework/Versions/8.0.0.36/bin/mtouch \
+	-sdkroot \
+	/Applications/Xcode.app/Contents/Developer \
+	--cache \
+	/Users/namkim/Projects/JTSImageViewController/SampleProject/obj/iPhoneSimulator/Debug/mtouch-cache \
+	--nomanifest \
+	--nosign \
+	-sim \
+	/Users/namkim/Projects/JTSImageViewController/SampleProject/bin/iPhoneSimulator/Debug/SampleProject.app \
+	-r \
+	/Users/namkim/Projects/JTSImageViewController/JTSImageViewController/bin/Debug/JTSImageViewController.dll \
+	-r \
+	/Library/Frameworks/Xamarin.iOS.framework/Versions/Current/lib/mono/2.1/System.dll \
+	-r \
+	/Library/Frameworks/Xamarin.iOS.framework/Versions/Current/lib/mono/2.1/System.Xml.dll \
+	-r \
+	/Library/Frameworks/Xamarin.iOS.framework/Versions/Current/lib/mono/2.1/System.Core.dll \
+	-r \
+	/Library/Frameworks/Xamarin.iOS.framework/Versions/Current/lib/mono/2.1/monotouch.dll \
+	-debug \
+	-nolink \
+	-sdk \
+	8.0 \
+	-targetver \
+	7.0 \
+	--abi=i386 \
+	/Users/namkim/Projects/JTSImageViewController/SampleProject/bin/iPhoneSimulator/Debug/SampleProject.exe \
