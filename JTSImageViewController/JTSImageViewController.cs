@@ -7,7 +7,7 @@ using MonoTouch.CoreGraphics;
 
 namespace JTSImageViewController
 {
-    public class JTSImageViewController : UIViewController, IJTSImageViewControllerDismissalDelegate, IUIScrollViewDelegate, IUIViewControllerTransitioningDelegate
+    public class JTSImageViewController : UIViewController, IUIScrollViewDelegate
     {
         // Enums
         public enum JTSImageViewControllerMode 
@@ -96,6 +96,7 @@ namespace JTSImageViewController
         private PointF ImageDragStartingPoint { get; set; }
         private UIOffset ImageDragOffsetFromActualTranslation { get; set; }
         private UIOffset ImageDragOffsetFromImageCenter { get; set; }
+        private JTSImageViewControllerTransition Transition { get; set; }
 
 
         // Private Properties - Image Downloading
@@ -131,12 +132,13 @@ namespace JTSImageViewController
         public void ShowFromViewController(UIViewController viewController, JTSImageViewControllerTransition transition) 
         {
             // self.setTransition = transition // where is he getting this setTransition method?
+            this.Transition = transition;
 
             StartingInfo.StatusBarHiddenPriorToPresentation = UIApplication.SharedApplication.StatusBarHidden;
             StartingInfo.StatusBarStylePriorToPresentation = UIApplication.SharedApplication.StatusBarStyle;
 
             if (Mode == JTSImageViewControllerMode.Image) {
-                if (Mode == JTSImageViewControllerTransition.FromOffscreen) {
+                if (this.Transition == JTSImageViewControllerTransition.FromOffscreen) {
                     ShowImageViewerByScalingDownFromOffscreenPositionWithViewController (viewController);
                 } else {
                     ShowImageViewerByExpandingFromOriginalPositionFromViewController (viewController);
@@ -159,6 +161,17 @@ namespace JTSImageViewController
             } else if (Mode == JTSImageViewControllerMode.Image) {
                 if (Flags.ImageIsFlickingAwayForDismissal) {
                     DismissByCleaningUpAfterImageWasFlickedOffscreen ();
+                } else if (this.Transition == JTSImageViewControllerTransition.FromOffscreen) { // TODO: self.transition == JTSImageViewControllerTransition_FromOffscreen
+                    DismissByExpandingImageToOffscreenPosition ();
+                } else {
+                    bool startingRectForThumbnailIsNonZero = !(StartingInfo.StartingReferenceFrameForThumbnail.X == 0 && StartingInfo.StartingReferenceFrameForThumbnail.Y == 0); 
+                    bool useCollapsingThumbnailStyle = startingRectForThumbnailIsNonZero && Image != null && this.Transition != JTSImageViewControllerTransition.FromOffscreen;
+
+                    if (useCollapsingThumbnailStyle) {
+                        DismissByCollapsingImageBackToOriginalPosition ();
+                    } else {
+                        DismissByExpandingImageToOffscreenPosition ();
+                    }
                 }
             }
 
@@ -172,13 +185,86 @@ namespace JTSImageViewController
 
         private void ShowImageViewerByExpandingFromOriginalPositionFromViewController(UIViewController viewController)
         {
+            Flags.IsAnimatingAPresentationOrDismissal = true;
+            View.UserInteractionEnabled = false;
 
+            SnapshotView = SnapshotFromParentmostViewController (viewController); // IMPLEMENT THIS
+
+            if (BackgroundStyle == JTSImageViewControllerBackgroundStyle.ScaledDimmedBlurred) {
+                BlurredSnapshotView = BlurredSnapshotFromParentmostViewController (viewController);
+                SnapshotView.AddSubview (BlurredSnapshotView);
+                BlurredSnapshotView.Alpha = 0;
+            }
+
+            View.InsertSubview (SnapshotView, 0);
+            StartingInfo.StartingInterfaceOrientation = UIApplication.SharedApplication.StatusBarOrientation;
+            LastUsedOrientation = UIApplication.SharedApplication.StatusBarOrientation;
+
+            RectangleF referenceFrameInWindow = ImageInfo.referenceView.ConvertRectToView (ImageInfo.referenceRect, null);
+            StartingInfo.StartingReferenceFrameForThumbnailInPresentingViewControllersOriginalOrientation = View.ConvertRectFromView (referenceFrameInWindow, null);
+
+            View.AddSubview (ImageView);
+
+            viewController.PresentViewController (this, false, () => {
+                if (UIApplication.SharedApplication.StatusBarOrientation != StartingInfo.StartingInterfaceOrientation) {
+                    StartingInfo.PresentingViewControllerPresentedFromItsUnsupportedOrientation = true;
+                }
+
+                RectangleF referenceFrameInMyView = View.ConvertRectFromView(referenceFrameInWindow, null);
+                StartingInfo.StartingReferenceFrameForThumbnail = referenceFrameInMyView;
+                UpdateScrollViewAndImageViewForCurrentMetrics();
+
+                bool mustRotateDuringTransition = UIApplication.SharedApplication.StatusBarOrientation != StartingInfo.StartingInterfaceOrientation;
+                if (mustRotateDuringTransition) {
+                    RectangleF newStartingRect = SnapshotView.ConvertRectToView(StartingInfo.StartingReferenceFrameForThumbnail, View);
+                    ImageView.Frame = newStartingRect;
+                    UpdateScrollViewAndImageViewForCurrentMetrics();
+
+                    ImageView.Transform = SnapshotView.Transform;
+                    PointF centerInRect = new PointF(0 + StartingInfo.StartingReferenceFrameForThumbnail.Size.Width/2.0f, 0 + StartingInfo.StartingReferenceFrameForThumbnail.Size.Height/2.0f);
+                    ImageView.Center = centerInRect;
+                }
+
+                /* OPTIONAL METHOD TO IMPLEMENT IN THE FUTURE
+                if ([self.optionsDelegate respondsToSelector:@selector(imageViewerShouldFadeThumbnailsDuringPresentationAndDismissal:)]) {
+                    if ([self.optionsDelegate imageViewerShouldFadeThumbnailsDuringPresentationAndDismissal:self]) {
+                        [self.imageView setAlpha:0];
+                        [UIView animateWithDuration:0.15f animations:^{
+                            [self.imageView setAlpha:1];
+                        }];
+                    }
+                }
+                */
+
+                float duration = JTSImageViewController.JTSImageViewController_TransitionAnimationDuration;
+                UIView.Animate(duration, 0, UIViewAnimationOptions.BeginFromCurrentState | UIViewAnimationOptions.CurveEaseInOut, () => {
+                    // animations
+                    Flags.IsTransitioningFromInitialModalToInteractiveState = true;
+
+
+                }, () => {
+                    // completion handler
+                });
+
+            });
         }
 
         private void ShowAltTextFromViewController(UIViewController viewController)
         {
 
         }
+
+        private UIView SnapshotFromParentmostViewController(UIViewController viewController)
+        {
+            return new UIView ();
+        }
+
+        private UIView BlurredSnapshotFromParentmostViewController(UIViewController viewController)
+        {
+            return new UIView ();
+        }
+
+
 
         // TODO: COMPLETE THIS METHOD LATER
         private void SetupImageAndDownloadIfNecessary(JTSImageInfo imageInfo) 
@@ -398,7 +484,7 @@ namespace JTSImageViewController
 
 
         // UIViewController Methods
-        public override UIInterfaceOrientationMask GetSupportedInterfaceOrientations ()
+        public override UIInterfaceOrientationMask GetSupportedInterfaceOrientations () // COMPLETE
         {
             UIInterfaceOrientationMask mask;
 
@@ -437,12 +523,12 @@ namespace JTSImageViewController
             return mask;
         }
 
-        public override bool ShouldAutorotate ()
+        public override bool ShouldAutorotate () // COMPLETE
         {
             return Flags.IsAnimatingAPresentationOrDismissal == false;
         }
 
-        public override bool PrefersStatusBarHidden ()
+        public override bool PrefersStatusBarHidden () // COMPLETE
         {
             if (Flags.IsPresented || Flags.IsTransitioningFromInitialModalToInteractiveState) {
                 return true;
@@ -450,24 +536,24 @@ namespace JTSImageViewController
             return StartingInfo.StatusBarHiddenPriorToPresentation;
         }
 
-        public override UIStatusBarAnimation PreferredStatusBarUpdateAnimation {
+        public override UIStatusBarAnimation PreferredStatusBarUpdateAnimation { // COMPLETE
             get {
                 return UIStatusBarAnimation.Fade;
             }
         }
 
-        public override UIModalTransitionStyle ModalTransitionStyle {
+        public override UIModalTransitionStyle ModalTransitionStyle { // COMPLETE
             get {
                 return UIModalTransitionStyle.CrossDissolve;
             }
         }
 
-        public override UIStatusBarStyle PreferredStatusBarStyle ()
+        public override UIStatusBarStyle PreferredStatusBarStyle () // COMPLETE
         {
             return StartingInfo.StatusBarStylePriorToPresentation;
         }
 
-        public override void ViewDidLoad ()
+        public override void ViewDidLoad () // COMPLETE
         {
             base.ViewDidLoad ();
             if (Mode == JTSImageViewControllerMode.Image) {
@@ -477,12 +563,12 @@ namespace JTSImageViewController
             }
         }
 
-        public override void ViewDidLayoutSubviews ()
+        public override void ViewDidLayoutSubviews () // COMPLETE
         {
             UpdateLayoutsForCurrentOrientation ();
         }
 
-        public override void ViewWillAppear (bool animated)
+        public override void ViewWillAppear (bool animated) // COMPLETE
         {
             base.ViewWillAppear (animated);
 
@@ -493,20 +579,20 @@ namespace JTSImageViewController
             }
         }
 
-        public override void ViewDidAppear (bool animated)
+        public override void ViewDidAppear (bool animated) // COMPLETE
         {
             base.ViewDidAppear (animated);
             Flags.ViewHasAppeared = true;
         }
 
-        public override void WillRotate (UIInterfaceOrientation toInterfaceOrientation, double duration)
+        public override void WillRotate (UIInterfaceOrientation toInterfaceOrientation, double duration) // COMPLETE
         {
             base.WillRotate (toInterfaceOrientation, duration);
             Flags.RotationTransformIsDirty = true;
             Flags.IsRotating = true;
         }
 
-        public override void WillAnimateRotation (UIInterfaceOrientation toInterfaceOrientation, double duration)
+        public override void WillAnimateRotation (UIInterfaceOrientation toInterfaceOrientation, double duration) // COMPLETE
         {
             base.WillAnimateRotation (toInterfaceOrientation, duration);
             CancelCurrentImageDrag (false);
