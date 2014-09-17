@@ -2,8 +2,21 @@
   <MonoDevelop.Ide.Workspace ActiveConfiguration="Debug" PreferredExecutionTarget="MonoDevelop.IPhone.IPhoneSimulatorTarget.IPhone5.8.0" />
   <MonoDevelop.Ide.Workbench ActiveDocument="JTSImageViewController/JTSImageViewController.cs">
     <Files>
-      <File FileName="JTSImageViewController/JTSImageViewController.cs" Line="21" Column="21" />
+      <File FileName="JTSImageViewController/JTSImageViewController.cs" Line="17" Column="17" />
     </Files>
+    <Pads>
+      <Pad Id="ProjectPad">
+        <State expanded="True">
+          <Node name="JTSImageViewController" expanded="True">
+            <Node name="JTSImageViewController.cs" selected="True" />
+          </Node>
+          <Node name="SampleProject" expanded="True" />
+        </State>
+      </Pad>
+      <Pad Id="MonoDevelop.Debugger.WatchPad">
+        <State />
+      </Pad>
+    </Pads>
   </MonoDevelop.Ide.Workbench>
   <MonoDevelop.Ide.DebuggingService.Breakpoints>
     <BreakpointStore />

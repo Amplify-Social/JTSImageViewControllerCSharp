@@ -456,11 +456,6 @@ namespace JTSImageViewController
 
         }
 
-        private void CancelCurrentImageDrag(bool animated)
-        {
-
-        }
-
         private void UpdateDimmingViewForCurrentZoomScale(bool animated)
         {
 
@@ -468,6 +463,31 @@ namespace JTSImageViewController
 
         private void SetupImageModeGestureRecognizers()
         {
+            UITapGestureRecognizer doubleTapper = null;
+            doubleTapper = new UITapGestureRecognizer (ImageDoubleTapped);
+            doubleTapper.NumberOfTapsRequired = 2;
+            doubleTapper.WeakDelegate = this;
+            DoubleTapperPhoto = doubleTapper;
+
+            UILongPressGestureRecognizer longPresser = new UILongPressGestureRecognizer (ImageLongPressed);
+            longPresser.WeakDelegate = this;
+            LongPresserPhoto = longPresser;
+
+            UITapGestureRecognizer singleTapper = null;
+            singleTapper = new UITapGestureRecognizer (ImageSingleTapped);
+            singleTapper.RequireGestureRecognizerToFail (doubleTapper);
+            singleTapper.RequireGestureRecognizerToFail (longPresser);
+            singleTapper.WeakDelegate = this;
+            SingleTapperPhoto = singleTapper;
+
+            UIPanGestureRecognizer panner = new UIPanGestureRecognizer (dismissingPanGestureRecognizerPanned);
+            panner.WeakDelegate = this;
+            ScrollView.AddGestureRecognizer (panner);
+            PanRecognizer = panner;
+
+            View.AddGestureRecognizer (singleTapper);
+            View.AddGestureRecognizer (doubleTapper);
+            View.AddGestureRecognizer (longPresser);
         }
 
         private UIColor BackgroundColorForImageView()
@@ -820,7 +840,30 @@ namespace JTSImageViewController
 
         private void DismissByCleaningUpAfterImageWasFlickedOffscreen()
         {
+            View.UserInteractionEnabled = false;
+            Flags.IsAnimatingAPresentationOrDismissal = true;
+            Flags.IsDismissing = true;
 
+            float duration = JTSImageViewController.JTSImageViewController_TransitionAnimationDuration;
+
+            UIView.Animate (duration, 0, UIViewAnimationOptions.BeginFromCurrentState | UIViewAnimationOptions.CurveEaseInOut, () => {
+                // animation
+                SnapshotView.Transform = CurrentSnapshotRotationTransform;
+                RemoveMotionEffectsFromSnapshotView();
+                BlackBackdrop.Alpha = 0;
+                if (BackgroundStyle == JTSImageViewControllerBackgroundStyle.ScaledDimmedBlurred) 
+                    BlurredSnapshotView.Alpha = 0;
+                ScrollView.Alpha = 0;
+
+                // if ([UIApplication sharedApplication].jts_usesViewControllerBasedStatusBarAppearance) {
+                //     [weakSelf setNeedsStatusBarAppearanceUpdate];
+                // } else {
+
+
+
+            }, () => {
+                // completion handler
+            });
         }
 
         private void DismissByExpandingImageToOffscreenPosition()
@@ -828,9 +871,36 @@ namespace JTSImageViewController
 
         }
 
-        private void DismissImageWithFlick(PointF velocity)
+        private void RemoveMotionEffectsFromSnapshotView() // COMPLETE
         {
+            foreach (var effect in SnapshotView.MotionEffects) {
+                SnapshotView.RemoveMotionEffect (effect);
+            }
+        }
 
+        private void DismissImageWithFlick(PointF velocity) // COMPLETE
+        {
+            Flags.ImageIsFlickingAwayForDismissal = true;
+            UIPushBehavior push = new UIPushBehavior (new IUIDynamicItem[] { ImageView }, UIPushBehaviorMode.Instantaneous);
+
+            push.PushDirection = new CGVector ((float)(velocity.X * 0.1), (float)(velocity.Y * 0.1));
+            push.SetTargetOffset (ImageDragOffsetFromImageCenter, ImageView);
+            push.Action = () => {
+                if (ImageViewIsOffscreen()) {
+                    Animator.RemoveAllBehaviors();
+                    AttachmentBehavior = null;
+                    ImageView.RemoveFromSuperview();
+                    Dismiss(true);
+                }
+            };
+            Animator.RemoveBehavior (AttachmentBehavior);
+            Animator.AddBehavior (push);
+        }
+
+        private bool ImageViewIsOffscreen()
+        {
+            RectangleF visibleRect = ScrollView.ConvertRectFromView (View.Bounds, View);
+            return Animator.GetDynamicItems (visibleRect).Length == 0;
         }
 
         // Gesture Recognizer Methods
@@ -951,8 +1021,109 @@ namespace JTSImageViewController
         {
             ImageDragStartingPoint = panGestureLocationInView;
             ImageDragOffsetFromActualTranslation = translationOffset;
+            PointF anchor = ImageDragStartingPoint;
+            PointF imageCenter = ImageView.Center;
+            UIOffset offset = new UIOffset (panGestureLocationInView.X - imageCenter.X, panGestureLocationInView.Y - imageCenter.Y);
+            ImageDragOffsetFromImageCenter = offset;
+            AttachmentBehavior = new UIAttachmentBehavior (ImageView, offset, anchor);
+            Animator.AddBehavior (AttachmentBehavior);
+            UIDynamicItemBehavior modifier = new UIDynamicItemBehavior(new IUIDynamicItem[] { ImageView });
+            modifier.AngularResistance = AppropriateAngularResistanceForView (ImageView);
+            Animator.AddBehavior (modifier);
+        }
+
+        private void CancelCurrentImageDrag(bool animated)
+        {
+            Animator.RemoveAllBehaviors ();
+            AttachmentBehavior = null;
+            Flags.IsDraggingImage = false;
+
+            if (animated == false) {
+                ImageView.Transform = CGAffineTransform.MakeIdentity ();
+                ImageView.Center = new PointF (ScrollView.ContentSize.Width / 2.0f, ScrollView.ContentSize.Height / 2.0f);
+            } else {
+                UIView.Animate (0.7, 0, UIViewAnimationOptions.AllowAnimatedContent | UIViewAnimationOptions.BeginFromCurrentState, () => {
+                    // animation
+                    if (Flags.IsDraggingImage == false) {
+                        ImageView.Transform = CGAffineTransform.MakeIdentity();
+                        if (ScrollView.Dragging == false && ScrollView.Decelerating == false) {
+                            ImageView.Center = new PointF(ScrollView.ContentSize.Width/2.0f, ScrollView.ContentSize.Height/2.0f);
+                            UpdateScrollViewAndImageViewForCurrentMetrics();
+                        }
+                    }
+                }, () => {
+                });
+            }
+        }
+
+        private float AppropriateAngularResistanceForView(UIView view) // COMPLETE
+        {
+            float height = View.Bounds.Size.Height;
+            float width = view.Bounds.Size.Width;
+            float actualArea = height * width;
+            float referenceArea = view.Bounds.Size.Width * view.Bounds.Size.Height;
+            float factor = referenceArea / actualArea;
+            float defaultResistance = 4.0f; 
+            float screenWidth = UIScreen.MainScreen.Bounds.Size.Width;
+            float screenHeight = UIScreen.MainScreen.Bounds.Size.Height;
+            float resistance = (float)(defaultResistance * ((320.0 * 480.0) / (screenWidth * screenHeight)));
+            return resistance * factor;
+        }
+
+        private float AppropriateDensityForView(UIView view)
+        {
+            float height = view.Bounds.Size.Height;
+            float width = view.Bounds.Size.Width;
+            float actualArea = height * width;
+            float referenceArea = view.Bounds.Size.Width * view.Bounds.Size.Height;
+            float factor = referenceArea / actualArea;
+            float defaultDensity = 0.5f;
+            float screenWidth = UIScreen.MainScreen.Bounds.Size.Width;
+            float screenHeight = UIScreen.MainScreen.Bounds.Size.Height;
+            float appropriateDensity = (float)(defaultDensity * ((320.0 * 480.0) / (screenWidth * screenHeight)));
+            return appropriateDensity * factor;
+        }
+
+        private PointF TargetDismissalPoint(PointF startingCenter, PointF velocity)
+        {
+            return new PointF ((float)(startingCenter.X + velocity.X / 3.0), (float)(startingCenter.Y + velocity.Y / 3.0));
+        }
+
+        // Gesture Recognizer Delegate Methods
+        private bool GestureRecognizer(UIGestureRecognizer gestureRecognizer, UITouch touch) // COMPLETE
+        {
+            bool shouldReceiveTouch = true;
+
+            shouldReceiveTouch = !(InteractionDelegate.ImageViewerShouldTemporarilyIgnoreTouches (this));
+            if (shouldReceiveTouch && gestureRecognizer == PanRecognizer) {
+                shouldReceiveTouch = (ScrollView.ZoomScale == 1 && Flags.ScrollViewIsAnimatingAZoom == false);
+            }
+
+            return shouldReceiveTouch;
+        }
+
+        private bool GestureRecognizer(UIGestureRecognizer gestureRecognizer, UIGestureRecognizer otherGestureRecognizer) // COMPLETE
+        {
+            return gestureRecognizer == SingleTapperText;
+        }
+
+        // Progress Bar Methods
+        private void StartProgressTimer()
+        {
+           
+        }
+
+        private void CancelProgressTimer()
+        {
 
         }
+
+        private void ProgressTimerFired(NSTimer timer)
+        {
+
+        }
+
+
 
         // UIScrollViewDelegate Methods
         [MonoTouch.Foundation.Export ("viewForZoomingInScrollView:")]
