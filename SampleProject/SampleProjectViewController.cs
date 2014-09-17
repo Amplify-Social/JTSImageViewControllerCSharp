@@ -30,7 +30,9 @@ namespace SampleProject
         public override void ViewDidAppear (bool animated)
         {
             base.ViewDidAppear (animated);
+
         }
+
 
         public override void ViewWillDisappear (bool animated)
         {

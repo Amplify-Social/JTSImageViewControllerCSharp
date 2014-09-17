@@ -7,7 +7,7 @@ using MonoTouch.CoreGraphics;
 
 namespace JTSImageViewController
 {
-    public class JTSImageViewController : UIViewController, IJTSImageViewControllerDismissalDelegate
+    public class JTSImageViewController : UIViewController, IJTSImageViewControllerDismissalDelegate, IUIScrollViewDelegate, IUIViewControllerTransitioningDelegate
     {
         // Enums
         public enum JTSImageViewControllerMode 
@@ -29,7 +29,7 @@ namespace JTSImageViewController
         }
 
         // Structs
-        public struct JTSImageViewControllerStartingInfo
+        public class JTSImageViewControllerStartingInfo
         {
             public bool StatusBarHiddenPriorToPresentation { get; set; }
             public UIStatusBarStyle StatusBarStylePriorToPresentation { get; set; }
@@ -40,7 +40,7 @@ namespace JTSImageViewController
             public bool PresentingViewControllerPresentedFromItsUnsupportedOrientation { get; set; }
         }
 
-        public struct JTSImageViewControllerFlags
+        public class JTSImageViewControllerFlags
         {
             public bool IsAnimatingAPresentationOrDismissal { get; set; }
             public bool IsDismissing { get; set; }
@@ -122,35 +122,439 @@ namespace JTSImageViewController
             if (Mode == JTSImageViewControllerMode.Image) {
                 SetupImageAndDownloadIfNecessary (imageInfo);
             }
+
+            Flags = new JTSImageViewControllerFlags ();
+            StartingInfo = new JTSImageViewControllerStartingInfo ();
         }
 
         // Public Methods
         public void ShowFromViewController(UIViewController viewController, JTSImageViewControllerTransition transition) 
         {
+            // self.setTransition = transition // where is he getting this setTransition method?
+
             StartingInfo.StatusBarHiddenPriorToPresentation = UIApplication.SharedApplication.StatusBarHidden;
             StartingInfo.StatusBarStylePriorToPresentation = UIApplication.SharedApplication.StatusBarStyle;
 
-
+            if (Mode == JTSImageViewControllerMode.Image) {
+                if (Mode == JTSImageViewControllerTransition.FromOffscreen) {
+                    ShowImageViewerByScalingDownFromOffscreenPositionWithViewController (viewController);
+                } else {
+                    ShowImageViewerByExpandingFromOriginalPositionFromViewController (viewController);
+                }
+            } else if (Mode == JTSImageViewControllerMode.AltText) {
+                ShowAltTextFromViewController (viewController);
+            }
         }
 
         public void Dismiss(bool animated)
         {
+            if (Flags.IsPresented == false) {
+                return;
+            }
+
+            Flags.IsPresented = false;
+
+            if (Mode == JTSImageViewControllerMode.AltText) {
+                DismissByExpandingAltTextToOffscreenPosition ();
+            } else if (Mode == JTSImageViewControllerMode.Image) {
+                if (Flags.ImageIsFlickingAwayForDismissal) {
+                    DismissByCleaningUpAfterImageWasFlickedOffscreen ();
+                }
+            }
 
         }
 
         // Private Methods
-        public void SetupImageAndDownloadIfNecessary(JTSImageInfo imageInfo) 
+        private void ShowImageViewerByScalingDownFromOffscreenPositionWithViewController(UIViewController viewController)
+        {
+
+        }
+
+        private void ShowImageViewerByExpandingFromOriginalPositionFromViewController(UIViewController viewController)
+        {
+
+        }
+
+        private void ShowAltTextFromViewController(UIViewController viewController)
+        {
+
+        }
+
+        // TODO: COMPLETE THIS METHOD LATER
+        private void SetupImageAndDownloadIfNecessary(JTSImageInfo imageInfo) 
+        {
+            if (imageInfo.Image != null) {
+                Image = imageInfo.Image;
+            } else {
+                Image = UIImage.FromBundle ("banecat");
+            }
+        }
+
+        // TODO: COMPLETE THIS METHOD
+        private void ViewDidLoadForImageMode() 
+        {
+            View.BackgroundColor = UIColor.Black;
+            View.AutoresizingMask = UIViewAutoresizing.FlexibleHeight | UIViewAutoresizing.FlexibleWidth;
+
+            this.BlackBackdrop = new UIView (new RectangleF (View.Bounds.X, View.Bounds.Y, -512, -512));
+            this.BlackBackdrop.BackgroundColor = UIColor.Black;
+            this.BlackBackdrop.Alpha = 0;
+            View.AddSubview (BlackBackdrop);
+
+            ScrollView = new UIScrollView (View.Bounds);
+            // ScrollView.Delegate = this; TODO: SET DELEGATE TO SELF
+            ScrollView.ZoomScale = 1.0f;
+            ScrollView.MaximumZoomScale = 8.0f;
+            ScrollView.ScrollEnabled = false;
+            ScrollView.IsAccessibilityElement = true;
+            //self.scrollView.accessibilityLabel = self.accessibilityLabel; // NEED TO IMPLEMENT THIS
+            ScrollView.AccessibilityHint = AccessibilityHintZoomedOut ();
+            View.AddSubview (ScrollView);
+
+
+            // CGRect referenceFrameInWindow = [self.imageInfo.referenceView convertRect:self.imageInfo.referenceRect toView:nil];
+            // CGRect referenceFrameInMyView = [self.view convertRect:referenceFrameInWindow fromView:nil];
+
+            RectangleF referenceFrameInWindow = ImageInfo.referenceView.ConvertRectToView (ImageInfo.referenceRect, null);
+            RectangleF referenceFrameInMyView = View.ConvertRectToView (referenceFrameInWindow, null);
+
+            ImageView = new UIImageView (referenceFrameInMyView);
+            ImageView.ContentMode = UIViewContentMode.ScaleAspectFill;
+            ImageView.UserInteractionEnabled = true;
+            ImageView.IsAccessibilityElement = false;
+            ImageView.ClipsToBounds = true;
+
+            SetupImageModeGestureRecognizers ();
+
+            ProgressContainer = new UIView (new RectangleF (0, 0, 128.0f, 128.0f));
+            View.AddSubview (ProgressContainer);
+
+
+
+            Animator = new UIDynamicAnimator (ScrollView);
+
+        }
+
+        private void ViewDidLoadForAltTextMode()
+        {
+
+        }
+
+        private void CancelCurrentImageDrag(bool animated)
+        {
+
+        }
+
+        private void UpdateDimmingViewForCurrentZoomScale(bool animated)
+        {
+
+        }
+
+        private void SetupImageModeGestureRecognizers()
+        {
+        }
+
+        private UIColor BackgroundColorForImageView()
+        {
+            return UIColor.Blue;
+        }
+
+        // Interface Updates
+        private void UpdateInterfaceWithImage(UIImage image)
+        {
+            if (image != null) {
+                Image = image;
+                ImageView.Image = image;
+                ProgressContainer.Alpha = 0;
+
+                ImageView.BackgroundColor = BackgroundColorForImageView ();
+
+                if (Flags.IsDraggingImage == false) {
+                    UpdateLayoutsForCurrentOrientation ();
+                }
+            }
+        }
+
+        private void UpdateLayoutsForCurrentOrientation()
+        {
+            if (Mode == JTSImageViewControllerMode.Image) {
+                UpdateScrollViewAndImageViewForCurrentMetrics ();
+                ProgressContainer.Center = new PointF (View.Bounds.Size.Width / 2.0f, View.Bounds.Size.Height / 2.0f);
+            } else if (Mode == JTSImageViewControllerMode.AltText) {
+                if (Flags.IsTransitioningFromInitialModalToInteractiveState == false) {
+                    VerticallyCenterTextInTextView ();
+                }
+            }
+
+            CGAffineTransform transform = CGAffineTransform.MakeIdentity ();
+
+            if (StartingInfo.StartingInterfaceOrientation == UIInterfaceOrientation.Portrait) {
+                switch (UIApplication.SharedApplication.StatusBarOrientation) {
+                case UIInterfaceOrientation.LandscapeLeft:
+                    transform = CGAffineTransform.MakeRotation ((float)Math.PI / 2.0f);
+                    break;
+                case UIInterfaceOrientation.LandscapeRight:
+                    transform = CGAffineTransform.MakeRotation ((float)-Math.PI / 2.0f);
+                    break;
+                case UIInterfaceOrientation.Portrait:
+                    transform = CGAffineTransform.MakeIdentity ();
+                    break;
+                case UIInterfaceOrientation.PortraitUpsideDown:
+                    transform = CGAffineTransform.MakeRotation ((float)Math.PI);
+                    break;
+                default:
+                    break;
+                }
+
+            } else if (StartingInfo.StartingInterfaceOrientation == UIInterfaceOrientation.PortraitUpsideDown) {
+                switch (UIApplication.SharedApplication.StatusBarOrientation) {
+                case UIInterfaceOrientation.LandscapeLeft:
+                    transform = CGAffineTransform.MakeRotation ((float)-Math.PI / 2.0f);
+                    break;
+                case UIInterfaceOrientation.LandscapeRight:
+                    transform = CGAffineTransform.MakeRotation ((float)Math.PI / 2.0f);
+                    break;
+                case UIInterfaceOrientation.Portrait:
+                    transform = CGAffineTransform.MakeRotation ((float)Math.PI);
+                    break;
+                case UIInterfaceOrientation.PortraitUpsideDown:
+                    transform = CGAffineTransform.MakeIdentity ();
+                    break;
+                default:
+                    break;
+                }
+            } else if (StartingInfo.StartingInterfaceOrientation == UIInterfaceOrientation.LandscapeLeft) {
+                switch (UIApplication.SharedApplication.StatusBarOrientation) {
+                case UIInterfaceOrientation.LandscapeLeft:
+                    transform = CGAffineTransform.MakeIdentity ();
+                    break;
+                case UIInterfaceOrientation.LandscapeRight:
+                    transform = CGAffineTransform.MakeRotation ((float)Math.PI);
+                    break;
+                case UIInterfaceOrientation.Portrait:
+                    transform = CGAffineTransform.MakeRotation ((float)-Math.PI / 2.0f);
+                    break;
+                case UIInterfaceOrientation.PortraitUpsideDown:
+                    transform = CGAffineTransform.MakeRotation ((float)Math.PI / 2.0f);
+                    break;
+                default:
+                    break;
+                }
+            } else if (StartingInfo.StartingInterfaceOrientation == UIInterfaceOrientation.LandscapeRight) {
+                switch (UIApplication.SharedApplication.StatusBarOrientation) {
+                case UIInterfaceOrientation.LandscapeLeft:
+                    transform = CGAffineTransform.MakeRotation ((float)Math.PI);
+                    break;
+                case UIInterfaceOrientation.LandscapeRight:
+                    transform = CGAffineTransform.MakeIdentity ();
+                    break;
+                case UIInterfaceOrientation.Portrait:
+                    transform = CGAffineTransform.MakeRotation ((float)Math.PI / 2.0f);
+                    break;
+                case UIInterfaceOrientation.PortraitUpsideDown:
+                    transform = CGAffineTransform.MakeRotation ((float)-Math.PI / 2.0f);
+                    break;
+                default:
+                    break;
+                }
+            }
+
+            SnapshotView.Center = new PointF (View.Bounds.Size.Width / 2.0f, View.Bounds.Size.Height / 2.0f);
+
+            if (Flags.RotationTransformIsDirty) {
+                Flags.RotationTransformIsDirty = false;
+                CurrentSnapshotRotationTransform = transform;
+                if (Flags.IsPresented) {
+                    if (Mode == JTSImageViewControllerMode.Image) {
+                        ScrollView.Frame = View.Bounds;
+                    }
+                    float scaling = JTSImageViewController.JTSImageViewController_MinimumBackgroundScaling;
+                    // SnapshotView.Transform = CGAffineTransform.CGRectApplyAffineTransform 
+
+                }
+            }
+
+        }
+
+        private void VerticallyCenterTextInTextView() // COMPLETE
+        {
+            RectangleF boundingRect = TextView.LayoutManager.GetUsedRectForTextContainer (TextView.TextContainer);
+            UIEdgeInsets insets = TextView.ContentInset;
+            if (View.Bounds.Size.Height > boundingRect.Size.Height) {
+                insets.Top = (View.Bounds.Size.Height - boundingRect.Size.Height) / 2.0f;
+            } else {
+                insets.Top = 0;
+            }
+
+            TextView.ContentInset = insets;
+            TextView.ContentOffset = new PointF (0, 0 - insets.Top);
+        }
+
+        private void UpdateScrollViewAndImageViewForCurrentMetrics()
         {
 
         }
 
 
-        // UIViewController Methods
 
-        // Delegate Methods
-        public void ImageViewerDidDismiss(JTSImageViewController imageViewer)
+        // UIViewController Methods
+        public override UIInterfaceOrientationMask GetSupportedInterfaceOrientations ()
+        {
+            UIInterfaceOrientationMask mask;
+
+            if (Flags.ViewHasAppeared == false) {
+                switch (UIApplication.SharedApplication.StatusBarOrientation) 
+                {
+                case UIInterfaceOrientation.LandscapeLeft:
+                    mask = UIInterfaceOrientationMask.LandscapeLeft;
+                    break;
+
+                case UIInterfaceOrientation.LandscapeRight:
+                    mask = UIInterfaceOrientationMask.LandscapeRight;
+                    break;
+
+                case UIInterfaceOrientation.Portrait:
+                    mask = UIInterfaceOrientationMask.Portrait;
+                    break;
+
+                case UIInterfaceOrientation.PortraitUpsideDown:
+                    mask = UIInterfaceOrientationMask.PortraitUpsideDown;
+                    break;
+
+                default:
+                    mask = UIInterfaceOrientationMask.Portrait;
+                    break;
+
+                }
+            }
+            else if (UIDevice.CurrentDevice.UserInterfaceIdiom == UIUserInterfaceIdiom.Pad) {
+                mask = UIInterfaceOrientationMask.All;
+            }
+            else {
+                mask = UIInterfaceOrientationMask.AllButUpsideDown;
+            }
+
+            return mask;
+        }
+
+        public override bool ShouldAutorotate ()
+        {
+            return Flags.IsAnimatingAPresentationOrDismissal == false;
+        }
+
+        public override bool PrefersStatusBarHidden ()
+        {
+            if (Flags.IsPresented || Flags.IsTransitioningFromInitialModalToInteractiveState) {
+                return true;
+            }
+            return StartingInfo.StatusBarHiddenPriorToPresentation;
+        }
+
+        public override UIStatusBarAnimation PreferredStatusBarUpdateAnimation {
+            get {
+                return UIStatusBarAnimation.Fade;
+            }
+        }
+
+        public override UIModalTransitionStyle ModalTransitionStyle {
+            get {
+                return UIModalTransitionStyle.CrossDissolve;
+            }
+        }
+
+        public override UIStatusBarStyle PreferredStatusBarStyle ()
+        {
+            return StartingInfo.StatusBarStylePriorToPresentation;
+        }
+
+        public override void ViewDidLoad ()
+        {
+            base.ViewDidLoad ();
+            if (Mode == JTSImageViewControllerMode.Image) {
+                ViewDidLoadForImageMode ();
+            } else if (Mode == JTSImageViewControllerMode.AltText) {
+                ViewDidLoadForAltTextMode ();
+            }
+        }
+
+        public override void ViewDidLayoutSubviews ()
+        {
+            UpdateLayoutsForCurrentOrientation ();
+        }
+
+        public override void ViewWillAppear (bool animated)
+        {
+            base.ViewWillAppear (animated);
+
+            if (LastUsedOrientation != UIApplication.SharedApplication.StatusBarOrientation) {
+                LastUsedOrientation = UIApplication.SharedApplication.StatusBarOrientation;
+                Flags.RotationTransformIsDirty = true;
+                UpdateLayoutsForCurrentOrientation ();
+            }
+        }
+
+        public override void ViewDidAppear (bool animated)
+        {
+            base.ViewDidAppear (animated);
+            Flags.ViewHasAppeared = true;
+        }
+
+        public override void WillRotate (UIInterfaceOrientation toInterfaceOrientation, double duration)
+        {
+            base.WillRotate (toInterfaceOrientation, duration);
+            Flags.RotationTransformIsDirty = true;
+            Flags.IsRotating = true;
+        }
+
+        public override void WillAnimateRotation (UIInterfaceOrientation toInterfaceOrientation, double duration)
+        {
+            base.WillAnimateRotation (toInterfaceOrientation, duration);
+            CancelCurrentImageDrag (false);
+            UpdateLayoutsForCurrentOrientation ();
+            UpdateDimmingViewForCurrentZoomScale (false);
+            /*
+             *     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, duration * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+                    _flags.isRotating = NO;
+                    });
+             */
+        }
+
+        // Dismissal Methods
+        private void DismissByCollapsingImageBackToOriginalPosition()
+        {
+            View.UserInteractionEnabled = false;
+            Flags.IsAnimatingAPresentationOrDismissal = true;
+            Flags.IsDismissing = true;
+
+
+        }
+
+        private void DismissByExpandingAltTextToOffscreenPosition()
         {
 
+        }
+
+        private void DismissByCleaningUpAfterImageWasFlickedOffscreen()
+        {
+
+        }
+
+        private void DismissByExpandingImageToOffscreenPosition()
+        {
+
+        }
+
+        // Delegate Methods
+        private void ImageViewerDidDismiss(JTSImageViewController imageViewer)
+        {
+
+        }
+
+
+        // Accessibility Methods
+        public string AccessibilityHintZoomedOut() 
+        {
+            return null;
         }
     }
 }
