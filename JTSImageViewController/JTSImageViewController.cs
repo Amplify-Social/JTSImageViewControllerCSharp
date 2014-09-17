@@ -241,9 +241,58 @@ namespace JTSImageViewController
                     // animations
                     Flags.IsTransitioningFromInitialModalToInteractiveState = true;
 
+                    // if ([UIApplication sharedApplication].jts_usesViewControllerBasedStatusBarAppearance) {
+                    //    [weakSelf setNeedsStatusBarAppearanceUpdate];
+                    UIApplication.SharedApplication.SetStatusBarHidden(true, UIStatusBarAnimation.Fade);
+
+                    float scaling = JTSImageViewController.JTSImageViewController_MinimumBackgroundScaling;
+                    // weakSelf.snapshotView.transform = CGAffineTransformConcat(weakSelf.snapshotView.transform, CGAffineTransformMakeScale(scaling, scaling));
+
+                    if (BackgroundStyle == JTSImageViewControllerBackgroundStyle.ScaledDimmedBlurred) {
+                        BlurredSnapshotView.Alpha = 1;
+                    }
+                    AddMotionEffectsToSnapshotView();
+                    BlackBackdrop.Alpha = JTSImageViewController_DefaultAlphaForBackgroundDimmingOverlay;
+
+                    if (mustRotateDuringTransition)
+                        ImageView.Transform = CGAffineTransform.MakeIdentity();
+
+                    RectangleF endFrameForImageView;
+                    if (Image != null) {
+
+                        endFrameForImageView = ResizedFrameForAutorotatingImageView(Image.Size);
+                    }   else {
+                        endFrameForImageView = ResizedFrameForAutorotatingImageView(ImageInfo.referenceRect.Size);
+                    }
+
+                    ImageView.Frame = endFrameForImageView;
+
+                    PointF endCenterForImageView = new PointF(View.Bounds.Size.Width/2.0f, View.Bounds.Size.Height/2.0f);
+                    ImageView.Center = endCenterForImageView;
+
+                    if (Image == null) {
+                        ProgressContainer.Alpha = 1.0f;
+                    }
 
                 }, () => {
                     // completion handler
+                    Flags.IsManuallyResizingTheScrollViewFrame = true;
+                    ScrollView.Frame = View.Bounds;
+                    Flags.IsManuallyResizingTheScrollViewFrame = false;
+                    ScrollView.AddSubview(ImageView);
+
+                    Flags.IsTransitioningFromInitialModalToInteractiveState = false;
+                    Flags.IsAnimatingAPresentationOrDismissal = false;
+                    Flags.IsPresented = true;
+
+                    UpdateScrollViewAndImageViewForCurrentMetrics();
+
+                    if (Flags.ImageDownloadFailed) {
+                        Dismiss(true);
+                    } else {
+                        View.UserInteractionEnabled = true;
+                    }
+
                 });
 
             });
@@ -264,7 +313,15 @@ namespace JTSImageViewController
             return new UIView ();
         }
 
+        private void AddMotionEffectsToSnapshotView()
+        {
 
+        }
+
+        private RectangleF ResizedFrameForAutorotatingImageView(SizeF imageSize)
+        {
+            return new RectangleF();
+        }
 
         // TODO: COMPLETE THIS METHOD LATER
         private void SetupImageAndDownloadIfNecessary(JTSImageInfo imageInfo) 
@@ -272,7 +329,7 @@ namespace JTSImageViewController
             if (imageInfo.Image != null) {
                 Image = imageInfo.Image;
             } else {
-                Image = UIImage.FromBundle ("banecat");
+                Image = UIImage.FromBundle ("banecat.jpg");
             }
         }
 
@@ -294,7 +351,7 @@ namespace JTSImageViewController
             ScrollView.ScrollEnabled = false;
             ScrollView.IsAccessibilityElement = true;
             //self.scrollView.accessibilityLabel = self.accessibilityLabel; // NEED TO IMPLEMENT THIS
-            ScrollView.AccessibilityHint = AccessibilityHintZoomedOut ();
+            // ScrollView.AccessibilityHint = AccessibilityHintZoomedOut (); // NEED TO IMPLEMENT THIS
             View.AddSubview (ScrollView);
 
 
@@ -315,10 +372,27 @@ namespace JTSImageViewController
             ProgressContainer = new UIView (new RectangleF (0, 0, 128.0f, 128.0f));
             View.AddSubview (ProgressContainer);
 
+            ProgressView = new UIProgressView (UIProgressViewStyle.Default);
+            ProgressView.Progress = 0;
+            ProgressView.TintColor = UIColor.White;
+            ProgressView.TrackTintColor = UIColor.DarkGray;
 
+            RectangleF progressFrame = ProgressView.Frame;
+            ProgressView.Frame = progressFrame;
+            ProgressView.Center = new PointF (64.0f, 64.0f);
+            ProgressView.Alpha = 0;
+            ProgressContainer.AddSubview (ProgressView);
+            Spinner = new UIActivityIndicatorView (UIActivityIndicatorViewStyle.WhiteLarge);
+            Spinner.Center = new PointF (64.0f, 64.0f);
+            Spinner.StartAnimating();
+            ProgressContainer.AddSubview (Spinner);
+            ProgressContainer.Alpha = 0;
 
             Animator = new UIDynamicAnimator (ScrollView);
 
+            if (Image != null) {
+                UpdateInterfaceWithImage (Image);
+            }
         }
 
         private void ViewDidLoadForAltTextMode()
@@ -445,6 +519,10 @@ namespace JTSImageViewController
                 }
             }
 
+            // TEST CODE BELOW - DELETE LATER
+            SnapshotView = new UIView ();
+            // TEST CODE ABOVE - DELETE LATER
+
             SnapshotView.Center = new PointF (View.Bounds.Size.Width / 2.0f, View.Bounds.Size.Height / 2.0f);
 
             if (Flags.RotationTransformIsDirty) {
@@ -478,9 +556,31 @@ namespace JTSImageViewController
 
         private void UpdateScrollViewAndImageViewForCurrentMetrics()
         {
+            if (Flags.IsAnimatingAPresentationOrDismissal == false) {
+                Flags.IsManuallyResizingTheScrollViewFrame = true;
+                ScrollView.Frame = View.Bounds;
+                Flags.IsManuallyResizingTheScrollViewFrame = false;
+            }
+
+            bool usingOriginalPositionTransition = (this.Transition == JTSImageViewControllerTransition.FromOriginalPosition);
+            bool suppressAdjustments = usingOriginalPositionTransition && Flags.IsAnimatingAPresentationOrDismissal;
+
+            if (suppressAdjustments == false) {
+                if (Image != null)
+                    ImageView.Frame = ResizedFrameForAutorotatingImageView (Image.Size);
+                else
+                    ImageView.Frame = ResizedFrameForAutorotatingImageView (ImageInfo.referenceRect.Size);
+                ScrollView.ContentSize = ImageView.Frame.Size;
+                ScrollView.ContentInset = ContentInsetForScrollView (ScrollView.ZoomScale);
+
+            }
 
         }
 
+        private UIEdgeInsets ContentInsetForScrollView(float zoomScale)
+        {
+            return new UIEdgeInsets ();
+        }
 
 
         // UIViewController Methods
