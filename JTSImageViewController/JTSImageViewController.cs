@@ -4,6 +4,7 @@ using MonoTouch.Accelerate;
 using System.Diagnostics;
 using System.Drawing;
 using MonoTouch.CoreGraphics;
+using MonoTouch.Foundation;
 
 namespace JTSImageViewController
 {
@@ -98,6 +99,9 @@ namespace JTSImageViewController
         private UIOffset ImageDragOffsetFromImageCenter { get; set; }
         private JTSImageViewControllerTransition Transition { get; set; }
 
+        // Delegates
+
+
 
         // Private Properties - Image Downloading
         // @property (strong, nonatomic) NSURLSessionDataTask *imageDownloadDataTask;
@@ -134,6 +138,7 @@ namespace JTSImageViewController
             // self.setTransition = transition // where is he getting this setTransition method?
             this.Transition = transition;
 
+            StartingInfo.StartingInterfaceOrientation = UIInterfaceOrientation.Portrait; // TEST CODE - DELETE LATER
             StartingInfo.StatusBarHiddenPriorToPresentation = UIApplication.SharedApplication.StatusBarHidden;
             StartingInfo.StatusBarStylePriorToPresentation = UIApplication.SharedApplication.StatusBarStyle;
 
@@ -188,7 +193,7 @@ namespace JTSImageViewController
             Flags.IsAnimatingAPresentationOrDismissal = true;
             View.UserInteractionEnabled = false;
 
-            SnapshotView = SnapshotFromParentmostViewController (viewController); // IMPLEMENT THIS
+            SnapshotView = SnapshotFromParentmostViewController (viewController);
 
             if (BackgroundStyle == JTSImageViewControllerBackgroundStyle.ScaledDimmedBlurred) {
                 BlurredSnapshotView = BlurredSnapshotFromParentmostViewController (viewController);
@@ -246,7 +251,9 @@ namespace JTSImageViewController
                     UIApplication.SharedApplication.SetStatusBarHidden(true, UIStatusBarAnimation.Fade);
 
                     float scaling = JTSImageViewController.JTSImageViewController_MinimumBackgroundScaling;
+
                     // weakSelf.snapshotView.transform = CGAffineTransformConcat(weakSelf.snapshotView.transform, CGAffineTransformMakeScale(scaling, scaling));
+                    SnapshotView.Transform = SnapshotView.Transform * CGAffineTransform.MakeScale(scaling, scaling);
 
                     if (BackgroundStyle == JTSImageViewControllerBackgroundStyle.ScaledDimmedBlurred) {
                         BlurredSnapshotView.Alpha = 1;
@@ -259,7 +266,6 @@ namespace JTSImageViewController
 
                     RectangleF endFrameForImageView;
                     if (Image != null) {
-
                         endFrameForImageView = ResizedFrameForAutorotatingImageView(Image.Size);
                     }   else {
                         endFrameForImageView = ResizedFrameForAutorotatingImageView(ImageInfo.referenceRect.Size);
@@ -303,9 +309,15 @@ namespace JTSImageViewController
 
         }
 
+        // Snapshots Methods
         private UIView SnapshotFromParentmostViewController(UIViewController viewController)
         {
-            return new UIView ();
+            UIViewController presentingViewController = viewController.View.Window.RootViewController;
+            while (presentingViewController.PresentedViewController != null)
+                presentingViewController = presentingViewController.PresentingViewController;
+            UIView snapShot = presentingViewController.View.SnapshotView (true);
+            snapShot.ClipsToBounds = true;
+            return snapShot;
         }
 
         private UIView BlurredSnapshotFromParentmostViewController(UIViewController viewController)
@@ -313,14 +325,59 @@ namespace JTSImageViewController
             return new UIView ();
         }
 
+        // Motion Effects Methods
         private void AddMotionEffectsToSnapshotView()
         {
+            NSNumber positiveValue = new NSNumber(12);
+            NSNumber negativeValue = new NSNumber (-12);
 
+            UIInterpolatingMotionEffect verticalEffect;
+            verticalEffect = new UIInterpolatingMotionEffect ("center.y", UIInterpolatingMotionEffectType.TiltAlongVerticalAxis);
+            verticalEffect.MinimumRelativeValue = positiveValue;
+            verticalEffect.MaximumRelativeValue = negativeValue;
+
+            UIInterpolatingMotionEffect horizontalEffect;
+            horizontalEffect = new UIInterpolatingMotionEffect ("center.x", UIInterpolatingMotionEffectType.TiltAlongHorizontalAxis);
+            horizontalEffect.MinimumRelativeValue = positiveValue;
+            horizontalEffect.MaximumRelativeValue = negativeValue;
+
+            UIMotionEffectGroup effectGroup = new UIMotionEffectGroup ();
+            effectGroup.MotionEffects = new UIMotionEffect[] { verticalEffect, horizontalEffect };
+            SnapshotView.AddMotionEffect (effectGroup);
         }
 
         private RectangleF ResizedFrameForAutorotatingImageView(SizeF imageSize)
         {
-            return new RectangleF();
+            RectangleF frame = View.Bounds;
+            float screenWidth = frame.Size.Width * ScrollView.ZoomScale;
+            float screenHeight = frame.Size.Height * ScrollView.ZoomScale;
+            float targetWidth = screenWidth;
+            float targetHeight = screenHeight;
+            float nativeHeight = screenHeight;
+            float nativeWidth = screenWidth;
+
+            if (imageSize.Width > 0 && imageSize.Height > 0) {
+                nativeHeight = (imageSize.Height > 0) ? imageSize.Height : screenHeight;
+                nativeWidth = (imageSize.Width > 0) ? imageSize.Width : screenWidth;
+            }
+            if (nativeHeight > nativeWidth) {
+                if (screenHeight / screenWidth < nativeHeight / nativeWidth) {
+                    targetWidth = screenHeight / (nativeHeight / nativeWidth);
+                } else {
+                    targetHeight = screenWidth / (nativeWidth / nativeHeight);
+                }
+            } else {
+                if (screenWidth / screenHeight < nativeWidth / nativeHeight) {
+                    targetHeight = screenWidth / (nativeWidth / nativeHeight);
+                } else {
+                    targetWidth = screenHeight / (nativeHeight / nativeWidth);
+                }
+            }
+
+            frame.Size = new SizeF (targetWidth, targetHeight);
+            frame.X = 0;
+            frame.Y = 0;
+            return frame;
         }
 
         // TODO: COMPLETE THIS METHOD LATER
@@ -345,21 +402,18 @@ namespace JTSImageViewController
             View.AddSubview (BlackBackdrop);
 
             ScrollView = new UIScrollView (View.Bounds);
-            // ScrollView.Delegate = this; TODO: SET DELEGATE TO SELF
+            ScrollView.WeakDelegate = this;
             ScrollView.ZoomScale = 1.0f;
             ScrollView.MaximumZoomScale = 8.0f;
             ScrollView.ScrollEnabled = false;
             ScrollView.IsAccessibilityElement = true;
+
             //self.scrollView.accessibilityLabel = self.accessibilityLabel; // NEED TO IMPLEMENT THIS
             // ScrollView.AccessibilityHint = AccessibilityHintZoomedOut (); // NEED TO IMPLEMENT THIS
             View.AddSubview (ScrollView);
 
-
-            // CGRect referenceFrameInWindow = [self.imageInfo.referenceView convertRect:self.imageInfo.referenceRect toView:nil];
-            // CGRect referenceFrameInMyView = [self.view convertRect:referenceFrameInWindow fromView:nil];
-
             RectangleF referenceFrameInWindow = ImageInfo.referenceView.ConvertRectToView (ImageInfo.referenceRect, null);
-            RectangleF referenceFrameInMyView = View.ConvertRectToView (referenceFrameInWindow, null);
+            RectangleF referenceFrameInMyView = View.ConvertRectFromView (referenceFrameInWindow, null);
 
             ImageView = new UIImageView (referenceFrameInMyView);
             ImageView.ContentMode = UIViewContentMode.ScaleAspectFill;
@@ -416,7 +470,7 @@ namespace JTSImageViewController
 
         private UIColor BackgroundColorForImageView()
         {
-            return UIColor.Blue;
+            return UIColor.Clear;
         }
 
         // Interface Updates
@@ -577,9 +631,52 @@ namespace JTSImageViewController
 
         }
 
-        private UIEdgeInsets ContentInsetForScrollView(float zoomScale)
+        private UIEdgeInsets ContentInsetForScrollView(float targetZoomScale)
         {
-            return new UIEdgeInsets ();
+            UIEdgeInsets inset = UIEdgeInsets.Zero;
+            float boundsHeight = ScrollView.Bounds.Size.Height;
+            float boundsWidth = ScrollView.Bounds.Size.Width;
+            float contentHeight = (Image.Size.Height > 0) ? Image.Size.Height : boundsHeight;
+            float contentWidth = (Image.Size.Width > 0) ? Image.Size.Width : boundsWidth;
+            float minContentHeight;
+            float minContentWidth;
+
+            if (contentHeight > contentWidth) {
+                if (boundsHeight / boundsWidth < contentHeight / contentWidth) {
+                    minContentHeight = boundsHeight;
+                    minContentWidth = contentWidth * (minContentHeight / contentHeight);
+                } else {
+                    minContentWidth = boundsWidth;
+                    minContentHeight = contentHeight * (minContentWidth / contentWidth);
+                }
+            } else {
+                if (boundsWidth / boundsHeight < contentWidth / contentHeight) {
+                    minContentWidth = boundsWidth;
+                    minContentHeight = contentHeight * (minContentWidth / contentWidth);
+                } else {
+                    minContentHeight = boundsHeight;
+                    minContentWidth = contentWidth * (minContentHeight / contentHeight);
+                }
+            }
+             
+            float myHeight = View.Bounds.Size.Height;
+            float myWidth = View.Bounds.Size.Width;
+            minContentWidth *= targetZoomScale;
+            minContentHeight *= targetZoomScale;
+            if (minContentHeight > myHeight && minContentWidth > myWidth) {
+                inset = UIEdgeInsets.Zero;
+            } else {
+                float verticalDiff = boundsHeight - minContentHeight;
+                float horizontalDiff = boundsWidth - minContentWidth;
+                verticalDiff = (verticalDiff > 0) ? verticalDiff : 0;
+                horizontalDiff = (horizontalDiff > 0) ? horizontalDiff : 0;
+                inset.Top = verticalDiff / 2.0f;
+                inset.Bottom = verticalDiff / 2.0f;
+                inset.Left = horizontalDiff / 2.0f;
+                inset.Right = horizontalDiff / 2.0f;
+            }
+
+            return inset;
         }
 
 
@@ -730,18 +827,149 @@ namespace JTSImageViewController
 
         }
 
+        // Gesture Recognizer Methods
+        private void ImageDoubleTapped(UITapGestureRecognizer sender)
+        {
+            if (Flags.ScrollViewIsAnimatingAZoom)
+                return;
+
+            PointF rawLocation = sender.LocationInView (sender.View);
+            PointF point = ScrollView.ConvertPointFromView (rawLocation, sender.View);
+            RectangleF targetZoomRect;
+            UIEdgeInsets targetInsets;
+
+            if (ScrollView.ZoomScale == 1.0f) {
+                ScrollView.AccessibilityHint = AccessibilityHintZoomedIn ();
+                float zoomWidth = View.Bounds.Size.Width / JTSImageViewController.JTSImageViewController_TargetZoomForDoubleTap;
+                float zoomHeight = View.Bounds.Size.Height / JTSImageViewController.JTSImageViewController_TargetZoomForDoubleTap;
+                targetZoomRect = new RectangleF (point.X - (zoomWidth / 2.0f), point.Y - (zoomHeight / 2.0f), zoomWidth, zoomHeight);
+                targetInsets = ContentInsetForScrollView(JTSImageViewController.JTSImageViewController_TargetZoomForDoubleTap);
+            } else {
+                ScrollView.AccessibilityHint = AccessibilityHintZoomedOut ();
+                float zoomWidth = View.Bounds.Size.Width * ScrollView.ZoomScale;
+                float zoomHeight = View.Bounds.Size.Height * ScrollView.ZoomScale;
+                targetZoomRect = new RectangleF (point.X - (zoomWidth / 2.0f), point.Y - (zoomHeight / 2.0f), zoomWidth, zoomHeight);
+                targetInsets = ContentInsetForScrollView (1.0f);
+            }
+
+            View.UserInteractionEnabled = false;
+            Flags.ScrollViewIsAnimatingAZoom = true;
+            ScrollView.ContentInset = targetInsets;
+            ScrollView.ZoomToRect (targetZoomRect, true);
+
+            // MUST BE IMPLEMENTED
+            /*
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 0.35 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+                [weakSelf.view setUserInteractionEnabled:YES];
+                _flags.scrollViewIsAnimatingAZoom = NO;
+            });
+            */
+
+        }
+
+        private void ImageSingleTapped(NSObject sender) 
+        {
+            if (Flags.ScrollViewIsAnimatingAZoom)
+                return;
+            Dismiss (true);
+        }
+
+        private void ImageLongPressed(UILongPressGestureRecognizer sender)
+        {
+            if (Flags.ScrollViewIsAnimatingAZoom)
+                return;
+
+            if (Image != null && sender.State == UIGestureRecognizerState.Began) {
+
+            }
+        }
+
+
         // Delegate Methods
         private void ImageViewerDidDismiss(JTSImageViewController imageViewer)
         {
 
         }
 
+        // UIScrollViewDelegate Methods
+        [MonoTouch.Foundation.Export ("viewForZoomingInScrollView:")]
+        public MonoTouch.UIKit.UIView ViewForZoomingInScrollView (MonoTouch.UIKit.UIScrollView scrollView)
+        {
+            return this.ImageView;
+        }
+
+        [MonoTouch.Foundation.Export ("scrollViewDidZoom:")]
+        public void DidZoom (MonoTouch.UIKit.UIScrollView scrollView)
+        {
+            if (Flags.ImageIsFlickingAwayForDismissal) {
+                return;
+            }
+
+            scrollView.ContentInset = ContentInsetForScrollView (scrollView.ZoomScale);
+            if (scrollView.ScrollEnabled == false) {
+                scrollView.ScrollEnabled = true;
+            }
+
+            if (Flags.IsAnimatingAPresentationOrDismissal == false && Flags.IsManuallyResizingTheScrollViewFrame == false) {
+                UpdateDimmingViewForCurrentZoomScale (true);
+            }
+        }
+
+        [MonoTouch.Foundation.Export ("scrollViewDidEndZooming:withView:atScale:")]
+        public void ZoomingEnded (MonoTouch.UIKit.UIScrollView scrollView, MonoTouch.UIKit.UIView withView, float atScale)
+        {
+            if (Flags.ImageIsFlickingAwayForDismissal) {
+                return;
+            }
+
+            scrollView.ScrollEnabled = (atScale > 1);
+            scrollView.ContentInset = ContentInsetForScrollView (atScale);
+        }
+
+        [MonoTouch.Foundation.Export ("scrollViewDidEndDragging:willDecelerate:")]
+        public void DraggingEnded (MonoTouch.UIKit.UIScrollView scrollView, bool willDecelerate)
+        {
+            if (Flags.ImageIsFlickingAwayForDismissal) {
+                return;
+            }
+
+            PointF velocity = scrollView.PanGestureRecognizer.VelocityInView (scrollView.PanGestureRecognizer.View);
+            if (scrollView.ZoomScale == 1 && (Math.Abs (velocity.X) > 1600 || Math.Abs (velocity.Y) > 1600)) {
+                Dismiss (true);
+            }
+        }
 
         // Accessibility Methods
-        public string AccessibilityHintZoomedOut() 
+        private string AccessibilityHintZoomedOut() 
         {
-            return null;
+            string hint = "";
+
+            return hint;
         }
+
+        private string AccessibilityHintZoomedIn()
+        {
+            string hint = "";
+            return hint;
+        }
+
+        private string DefaultAccessibilityLabelForScrollView()
+        {
+            return "Full-Screen Image Viewer";
+        }
+
+        private string DefaultAccessibilityHintForScrollView(bool zoomedIn)
+        {
+            string hint = "";
+            if (zoomedIn) {
+                hint = "Image is zoomed in. Pan around the image using three fingers. Double tap to dismiss this screen. Double tap and hold for more options. Triple tap the image to zoom out.";
+            } else {
+                hint = "Image is zoomed out. Double tap to dismiss this screen. Double tap and hold for more options. Triple tap the image to zoom in.";
+            }
+            return hint;
+        }
+
+
     }
 }
 
