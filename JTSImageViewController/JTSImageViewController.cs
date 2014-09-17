@@ -100,8 +100,10 @@ namespace JTSImageViewController
         private JTSImageViewControllerTransition Transition { get; set; }
 
         // Delegates
-
-
+        private JTSImageViewControllerDismissalDelegate DismissalDelegate { get; set; }
+        private JTSImageViewControllerOptionsDelegate OptionsDelegate { get; set; }
+        private JTSImageViewControllerInteractionsDelegate InteractionDelegate { get; set; }
+        private JTSImageViewControllerAccessibilityDelegate AccessibilityDelegate { get; set; }
 
         // Private Properties - Image Downloading
         // @property (strong, nonatomic) NSURLSessionDataTask *imageDownloadDataTask;
@@ -626,7 +628,6 @@ namespace JTSImageViewController
                     ImageView.Frame = ResizedFrameForAutorotatingImageView (ImageInfo.referenceRect.Size);
                 ScrollView.ContentSize = ImageView.Frame.Size;
                 ScrollView.ContentInset = ContentInsetForScrollView (ScrollView.ZoomScale);
-
             }
 
         }
@@ -827,6 +828,11 @@ namespace JTSImageViewController
 
         }
 
+        private void DismissImageWithFlick(PointF velocity)
+        {
+
+        }
+
         // Gesture Recognizer Methods
         private void ImageDoubleTapped(UITapGestureRecognizer sender)
         {
@@ -880,14 +886,71 @@ namespace JTSImageViewController
                 return;
 
             if (Image != null && sender.State == UIGestureRecognizerState.Began) {
+                this.InteractionDelegate.ImageViewerDidLongPress (this);
+            }
 
+            bool allowCopy = false;
+            allowCopy = this.InteractionDelegate.ImageViewerAllowCopyToPasteboard (this);
+
+            if (allowCopy) {
+                PointF location = sender.LocationInView (ImageView);
+                UIMenuController menuController = UIMenuController.SharedMenuController;
+
+                menuController.SetTargetRect (new RectangleF (location.X, location.Y, 0.0f, 0.0f), ImageView);
+                menuController.SetMenuVisible (true, true);
             }
         }
 
-
-        // Delegate Methods
-        private void ImageViewerDidDismiss(JTSImageViewController imageViewer)
+        private void dismissingPanGestureRecognizerPanned(UIPanGestureRecognizer panner)
         {
+            if (Flags.ScrollViewIsAnimatingAZoom || Flags.IsAnimatingAPresentationOrDismissal) 
+                return;
+
+            PointF translation = panner.TranslationInView (panner.View);
+            PointF locationInView = panner.LocationInView (panner.View);
+            PointF velocity = panner.VelocityInView (panner.View);
+            float vectorDistance = (float)Math.Sqrt (Math.Pow (velocity.X, 2) + Math.Pow (velocity.Y, 2));
+
+            if (panner.State == UIGestureRecognizerState.Began) {
+                Flags.IsDraggingImage = ImageView.Frame.Contains (locationInView);
+                if (Flags.IsDraggingImage)
+                    StartImageDragging (locationInView, new UIOffset ());
+            } else if (panner.State == UIGestureRecognizerState.Changed) {
+                if (Flags.IsDraggingImage) {
+                    PointF newAnchor = ImageDragStartingPoint;
+                    newAnchor.X += translation.X + ImageDragOffsetFromActualTranslation.Horizontal;
+                    newAnchor.Y += translation.Y + ImageDragOffsetFromActualTranslation.Vertical;
+                    AttachmentBehavior.AnchorPoint = newAnchor;
+                } else {
+                    Flags.IsDraggingImage = ImageView.Frame.Contains (locationInView);
+                    if (Flags.IsDraggingImage) {
+                        UIOffset translationOffset = new UIOffset (-1 * translation.X, -1 * translation.Y);
+                        StartImageDragging (locationInView, translationOffset);
+                    }
+                }
+            } else {
+                if (vectorDistance > JTSImageViewController.JTSImageViewController_MinimumFlickDismissalVelocity) {
+                    if (Flags.IsDraggingImage) {
+                        DismissImageWithFlick (velocity);
+                    } else {
+                        Dismiss (true);
+                    }
+                } else {
+                    CancelCurrentImageDrag (true);
+                }
+            }
+        }
+
+        private void TextViewSingleTapped(NSObject sender)
+        {
+            Dismiss (true);
+        }
+
+        // Dynamic Image Dragging Methods
+        private void StartImageDragging(PointF panGestureLocationInView, UIOffset translationOffset)
+        {
+            ImageDragStartingPoint = panGestureLocationInView;
+            ImageDragOffsetFromActualTranslation = translationOffset;
 
         }
 
@@ -969,6 +1032,83 @@ namespace JTSImageViewController
             return hint;
         }
 
+        // Delegate class implementation
+        public class JTSImageViewControllerDismissalDelegate : IJTSImageViewControllerDismissalDelegate
+        {
+            public void ImageViewerDidDismiss(JTSImageViewController imageViewer)
+            {
+
+            }
+        }
+
+        public class JTSImageViewControllerOptionsDelegate : IJTSImageViewControllerOptionsDelegate
+        {
+            public bool ImageViewerShouldFadeThumbnailsDuringPresentationAndDismissal(JTSImageViewController imageViewer)
+            {
+                return false;
+            }
+
+            public UIFont FontForAltTextInImageViewer(JTSImageViewController imageViewer)
+            {
+                return UIFont.PreferredBody;
+            }
+
+            public UIColor AccentColorForAltTextInImageViewer(JTSImageViewController imageViewer)
+            {
+                return UIColor.White;
+            }
+
+            public UIColor BackgroundColorImageViewInImageViewer(JTSImageViewController imageViewer)
+            {
+                return UIColor.White;
+            }
+
+            public float AlphaForBackgroundDimmingOverlayInImageViewer(JTSImageViewController imageViewer)
+            {
+                return 0;
+            }
+
+            public float BackgroundBlurRadiusForImageViewer(JTSImageViewController imageViewer)
+            {
+                return 0;
+            }
+        }
+
+        public class JTSImageViewControllerInteractionsDelegate : IJTSImageViewControllerInteractionsDelegate
+        {
+            public void ImageViewerDidLongPress(JTSImageViewController imageViewer)
+            {
+
+            }
+
+            public bool ImageViewerShouldTemporarilyIgnoreTouches(JTSImageViewController imageViewer)
+            {
+                return true;
+            }
+
+            public bool ImageViewerAllowCopyToPasteboard(JTSImageViewController imageViewer)
+            {
+                return true;
+            }
+        }
+
+        public class JTSImageViewControllerAccessibilityDelegate : IJTSImageViewControllerAccessibilityDelegate
+        {
+            public string AccessibilityLabelForImageViewer(JTSImageViewController imageViewer)
+            {
+                return "";
+            }
+
+            public string AccessibilityHintZoomedInForImageViewer(JTSImageViewController imageViewer)
+            {
+                return "";
+            }
+
+            public string AccessibilityHintZoomedOutForImageViewer(JTSImageViewController imageViewer)
+            {
+                return "";
+            }
+        }
 
     }
 }
