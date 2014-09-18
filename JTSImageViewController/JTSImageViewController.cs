@@ -132,6 +132,11 @@ namespace JTSImageViewController
 
             Flags = new JTSImageViewControllerFlags ();
             StartingInfo = new JTSImageViewControllerStartingInfo ();
+
+            DismissalDelegate = new JTSImageViewControllerDismissalDelegate ();
+            OptionsDelegate = new JTSImageViewControllerOptionsDelegate ();
+            InteractionDelegate = new JTSImageViewControllerInteractionsDelegate ();
+            AccessibilityDelegate = new JTSImageViewControllerAccessibilityDelegate ();
         }
 
         // Public Methods
@@ -858,11 +863,13 @@ namespace JTSImageViewController
                 // if ([UIApplication sharedApplication].jts_usesViewControllerBasedStatusBarAppearance) {
                 //     [weakSelf setNeedsStatusBarAppearanceUpdate];
                 // } else {
-
-
+                UIApplication.SharedApplication.SetStatusBarHidden(StartingInfo.StatusBarHiddenPriorToPresentation, UIStatusBarAnimation.Fade);
 
             }, () => {
                 // completion handler
+                PresentingViewController.DismissViewController(false, () => {
+                    DismissalDelegate.ImageViewerDidDismiss(this);
+                });
             });
         }
 
