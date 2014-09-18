@@ -34,8 +34,8 @@ namespace SampleProject
         {
             JTSImageInfo imageInfo = new JTSImageInfo ();
             imageInfo.Image = UIImage.FromBundle ("banecat.jpg");
-            imageInfo.referenceRect = catImageButton.Frame;
-            imageInfo.referenceView = catImageButton.Superview;
+            imageInfo.ReferenceRect = catImageButton.Frame;
+            imageInfo.ReferenceView = catImageButton.Superview;
 
             var imageViewer = new JTSImageViewController.JTSImageViewController (imageInfo, JTSImageViewController.JTSImageViewController.JTSImageViewControllerMode.Image, JTSImageViewController.JTSImageViewController.JTSImageViewControllerBackgroundStyle.ScaledDimmed);
             imageViewer.ShowFromViewController (this, JTSImageViewController.JTSImageViewController.JTSImageViewControllerTransition.FromOriginalPosition);

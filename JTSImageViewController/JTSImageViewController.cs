@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.Drawing;
 using MonoTouch.CoreGraphics;
 using MonoTouch.Foundation;
+using MonoTouch.CoreAnimation;
 
 namespace JTSImageViewController
 {
@@ -212,7 +213,7 @@ namespace JTSImageViewController
             StartingInfo.StartingInterfaceOrientation = UIApplication.SharedApplication.StatusBarOrientation;
             LastUsedOrientation = UIApplication.SharedApplication.StatusBarOrientation;
 
-            RectangleF referenceFrameInWindow = ImageInfo.referenceView.ConvertRectToView (ImageInfo.referenceRect, null);
+            RectangleF referenceFrameInWindow = ImageInfo.ReferenceView.ConvertRectToView (ImageInfo.ReferenceRect, null);
             StartingInfo.StartingReferenceFrameForThumbnailInPresentingViewControllersOriginalOrientation = View.ConvertRectFromView (referenceFrameInWindow, null);
 
             View.AddSubview (ImageView);
@@ -275,7 +276,7 @@ namespace JTSImageViewController
                     if (Image != null) {
                         endFrameForImageView = ResizedFrameForAutorotatingImageView(Image.Size);
                     }   else {
-                        endFrameForImageView = ResizedFrameForAutorotatingImageView(ImageInfo.referenceRect.Size);
+                        endFrameForImageView = ResizedFrameForAutorotatingImageView(ImageInfo.ReferenceRect.Size);
                     }
 
                     ImageView.Frame = endFrameForImageView;
@@ -393,6 +394,7 @@ namespace JTSImageViewController
             if (imageInfo.Image != null) {
                 Image = imageInfo.Image;
             } else {
+                // RUN TASK TO DOWNLOAD IMAGE HERE
                 Image = UIImage.FromBundle ("banecat.jpg");
             }
         }
@@ -414,12 +416,11 @@ namespace JTSImageViewController
             ScrollView.MaximumZoomScale = 8.0f;
             ScrollView.ScrollEnabled = false;
             ScrollView.IsAccessibilityElement = true;
-
             //self.scrollView.accessibilityLabel = self.accessibilityLabel; // NEED TO IMPLEMENT THIS
-            // ScrollView.AccessibilityHint = AccessibilityHintZoomedOut (); // NEED TO IMPLEMENT THIS
+            ScrollView.AccessibilityHint = AccessibilityHintZoomedOut ();
             View.AddSubview (ScrollView);
 
-            RectangleF referenceFrameInWindow = ImageInfo.referenceView.ConvertRectToView (ImageInfo.referenceRect, null);
+            RectangleF referenceFrameInWindow = ImageInfo.ReferenceView.ConvertRectToView (ImageInfo.ReferenceRect, null);
             RectangleF referenceFrameInMyView = View.ConvertRectFromView (referenceFrameInWindow, null);
 
             ImageView = new UIImageView (referenceFrameInMyView);
@@ -463,7 +464,19 @@ namespace JTSImageViewController
 
         private void UpdateDimmingViewForCurrentZoomScale(bool animated)
         {
+            float targetAlpha = (ScrollView.ZoomScale > 1) ? 1.0f : AlphaForBackgroundDimmingOverlay ();
+            float duration = (animated) ? 0.35f : 0;
+            UIView.Animate (duration, 0, UIViewAnimationOptions.CurveLinear | UIViewAnimationOptions.BeginFromCurrentState, () => {
+                // animation
+                BlackBackdrop.Alpha = targetAlpha;
+            }, null);               
+        }
 
+        // Options Delegate Convenience Methods
+        private float AlphaForBackgroundDimmingOverlay()
+        {
+            float alpha = JTSImageViewController_DefaultAlphaForBackgroundDimmingOverlay;
+            return alpha;
         }
 
         private void SetupImageModeGestureRecognizers()
@@ -650,7 +663,7 @@ namespace JTSImageViewController
                 if (Image != null)
                     ImageView.Frame = ResizedFrameForAutorotatingImageView (Image.Size);
                 else
-                    ImageView.Frame = ResizedFrameForAutorotatingImageView (ImageInfo.referenceRect.Size);
+                    ImageView.Frame = ResizedFrameForAutorotatingImageView (ImageInfo.ReferenceRect.Size);
                 ScrollView.ContentSize = ImageView.Frame.Size;
                 ScrollView.ContentInset = ContentInsetForScrollView (ScrollView.ZoomScale);
             }
@@ -834,6 +847,72 @@ namespace JTSImageViewController
             View.UserInteractionEnabled = false;
             Flags.IsAnimatingAPresentationOrDismissal = true;
             Flags.IsDismissing = true;
+
+            if (OptionsDelegate.ImageViewerShouldFadeThumbnailsDuringPresentationAndDismissal (this)) {
+                UIView.Animate(0.15, 0.18, 0, () => {
+                    // animate
+                    ImageView.Alpha = 0;
+                }, null);
+            }
+
+            RectangleF imageFrame = View.ConvertRectFromView (ImageView.Frame, ScrollView);
+            ImageView.AutoresizingMask = UIViewAutoresizing.None;
+            ImageView.Transform = CGAffineTransform.MakeIdentity ();
+            ImageView.Layer.Transform = CATransform3D.Identity;
+            ImageView.RemoveFromSuperview ();
+            ImageView.Frame = imageFrame;
+            View.AddSubview (ImageView);
+            ScrollView.RemoveFromSuperview ();
+            ScrollView = null;
+
+            // Have to dispatch after or else the image view changes above won't be
+            // committed prior to the animations below. A single dispatch_async(dispatch_get_main_queue()
+            // wouldn't work under certain scrolling conditions, so it has to be an ugly
+            // two runloops ahead.
+            float duration = JTSImageViewController.JTSImageViewController_TransitionAnimationDuration;
+            UIView.Animate (duration, 0, UIViewAnimationOptions.BeginFromCurrentState | UIViewAnimationOptions.CurveEaseInOut, () => {
+                // animation
+                SnapshotView.Transform = CurrentSnapshotRotationTransform;
+                RemoveMotionEffectsFromSnapshotView();
+                BlackBackdrop.Alpha = 0;
+
+                if (BackgroundStyle == JTSImageViewControllerBackgroundStyle.ScaledDimmedBlurred)
+                    BlurredSnapshotView.Alpha = 0;
+
+                bool mustRotateDuringTransition = (UIApplication.SharedApplication.StatusBarOrientation != StartingInfo.StartingInterfaceOrientation);
+                if (mustRotateDuringTransition) {
+                    RectangleF newEndingRect;
+                    PointF centerInRect;
+
+                    if (StartingInfo.PresentingViewControllerPresentedFromItsUnsupportedOrientation) {
+                        RectangleF rectToConvert = StartingInfo.StartingReferenceFrameForThumbnailInPresentingViewControllersOriginalOrientation;
+                        RectangleF rectForCentering = SnapshotView.ConvertRectToView(rectToConvert, View);
+                        centerInRect = new PointF(0 + rectForCentering.Size.Width/2.0f, 0 + rectForCentering.Size.Height/2.0f);
+                        newEndingRect = StartingInfo.StartingReferenceFrameForThumbnailInPresentingViewControllersOriginalOrientation;
+                    } else {
+                        newEndingRect = StartingInfo.StartingReferenceFrameForThumbnail;
+                        RectangleF rectForCentering = SnapshotView.ConvertRectToView(StartingInfo.StartingReferenceFrameForThumbnail, View);
+                        centerInRect = new PointF(0 + rectForCentering.Size.Width/2.0f, 0 + rectForCentering.Size.Height/2.0f);
+                    }
+
+                    ImageView.Frame = newEndingRect;
+                    ImageView.Transform = CurrentSnapshotRotationTransform;
+                    ImageView.Center = centerInRect;
+                } else {
+                    if (StartingInfo.PresentingViewControllerPresentedFromItsUnsupportedOrientation) {
+                        ImageView.Frame = StartingInfo.StartingReferenceFrameForThumbnailInPresentingViewControllersOriginalOrientation;
+                    } else {
+                        ImageView.Frame = StartingInfo.StartingReferenceFrameForThumbnail;
+                    }
+
+                    // Rotation not needed, so fade the status bar back in. Looks nicer.
+                    UIApplication.SharedApplication.SetStatusBarHidden(StartingInfo.StatusBarHiddenPriorToPresentation, UIStatusBarAnimation.Fade);
+                }
+            }, () => {
+                // completion handler
+                // Needed if dismissing from a different orientation then the one we started with
+                // NEEDS TO BE IMPLEMENTED
+            });
 
 
         }
@@ -1058,8 +1137,7 @@ namespace JTSImageViewController
                             UpdateScrollViewAndImageViewForCurrentMetrics();
                         }
                     }
-                }, () => {
-                });
+                }, null);
             }
         }
 
@@ -1077,7 +1155,7 @@ namespace JTSImageViewController
             return resistance * factor;
         }
 
-        private float AppropriateDensityForView(UIView view)
+        private float AppropriateDensityForView(UIView view) // COMPLETE
         {
             float height = view.Bounds.Size.Height;
             float width = view.Bounds.Size.Width;

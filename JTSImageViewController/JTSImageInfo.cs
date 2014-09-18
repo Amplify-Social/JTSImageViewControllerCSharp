@@ -12,24 +12,24 @@ namespace JTSImageViewController
         public UIImage PlaceholderImage { get; set; }
         public NSUrl ImageURL { get; set; }
         public NSUrl CanonicalImageURL { get; set; }
-        public string altText { get; set; }
-        public string title { get; set; }
-        public RectangleF referenceRect { get; set; }
-        public UIView referenceView { get; set; }
-        public Dictionary<string, string> userInfo { get; set; }
+        public string AltText { get; set; }
+        public string Title { get; set; }
+        public RectangleF ReferenceRect { get; set; }
+        public UIView ReferenceView { get; set; }
+        public Dictionary<string, string> UserInfo { get; set; }
 
         public JTSImageInfo()
         {
-            userInfo = new Dictionary<string, string> ();
+            UserInfo = new Dictionary<string, string> ();
         }
 
         public string DisplayableTitleAltTextSummary()
         {
             var text = "";
-            if (title.Length > 0) {
-                text = title;
-            } else if (altText.Length > 0) {
-                text = altText;
+            if (Title.Length > 0) {
+                text = Title;
+            } else if (AltText.Length > 0) {
+                text = AltText;
             }
             return text;
         }
@@ -37,11 +37,11 @@ namespace JTSImageViewController
         public string CombinedTitleAndAltText()
         {
             var text = "";
-            if (title.Length > 0) {
-                text += title;
+            if (Title.Length > 0) {
+                text += Title;
             }
-            if (altText.Length > 0 && title != altText) {
-                text += "\n\n- - -\n\n" + altText;
+            if (AltText.Length > 0 && Title != AltText) {
+                text += "\n\n- - -\n\n" + AltText;
             }
             return text;
         }
@@ -56,8 +56,8 @@ namespace JTSImageViewController
         public PointF ReferenceRectCenter()
         {
             PointF center = new PointF ();
-            center.X = (float)(this.referenceRect.Size.Width / 2.0);
-            center.Y = (float)(this.referenceRect.Size.Height / 2.0);
+            center.X = (float)(this.ReferenceRect.Size.Width / 2.0);
+            center.Y = (float)(this.ReferenceRect.Size.Height / 2.0);
 
             return center;
         }
