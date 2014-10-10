@@ -328,9 +328,38 @@ namespace JTSImageViewController
             return snapShot;
         }
 
+        // TODO: This isn't working just yet I dont think
         private UIView BlurredSnapshotFromParentmostViewController(UIViewController viewController)
         {
-            return new UIView ();
+            var presentingVc = viewController.View.Window.RootViewController;
+
+            var outerBleed = 20f;
+            var performanceDownScalingFactor = 0.25f;
+            var scaledOuterBleed = outerBleed * performanceDownScalingFactor;
+            var contextBounds = RectangleF.Inflate (presentingVc.View.Bounds, -outerBleed, -outerBleed);
+            var scaledBounds = contextBounds;
+            scaledBounds.Width *= performanceDownScalingFactor;
+            scaledBounds.Height *= performanceDownScalingFactor;
+            var scaledDrawingArea = presentingVc.View.Bounds;
+            scaledDrawingArea.Width *= performanceDownScalingFactor;
+            scaledDrawingArea.Height *= performanceDownScalingFactor;
+
+            UIGraphics.BeginImageContextWithOptions (scaledBounds.Size, true, 0);
+            var context = UIGraphics.GetCurrentContext ();
+            context.ConcatCTM (CGAffineTransform.MakeTranslation (scaledOuterBleed, scaledOuterBleed));
+            presentingVc.View.DrawViewHierarchy (scaledDrawingArea, true);
+            var image = UIGraphics.GetImageFromCurrentImageContext ();
+
+            UIGraphics.EndImageContext ();
+
+            var blurRadius = 2.0f;
+            var blurredImage = image.ApplyBlur (blurRadius, null, 1f, null);
+            var imageView = new UIImageView (contextBounds);
+            imageView.Image = blurredImage;
+            imageView.AutoresizingMask = UIViewAutoresizing.FlexibleHeight | UIViewAutoresizing.FlexibleWidth;
+            imageView.BackgroundColor = UIColor.Black;
+            return imageView;
+
         }
 
         // Motion Effects Methods
