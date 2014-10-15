@@ -998,7 +998,7 @@ namespace JTSImageViewController
             Flags.ImageIsFlickingAwayForDismissal = true;
             UIPushBehavior push = new UIPushBehavior (new IUIDynamicItem[] { ImageView }, UIPushBehaviorMode.Instantaneous);
 
-            push.PushDirection = new CGVector ((float)(velocity.X * 0.1), (float)(velocity.Y * 0.1));
+            push.PushDirection = new CGVector ((float)(velocity.X * 0.05), (float)(velocity.Y * 0.05));
             push.SetTargetOffset (ImageDragOffsetFromImageCenter, ImageView);
             push.Action = () => {
                 if (ImageViewIsOffscreen()) {
