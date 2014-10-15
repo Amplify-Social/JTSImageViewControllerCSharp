@@ -51,7 +51,7 @@ namespace JTSImageViewController
             return ApplyBlur (self, blurRadius: 10, tintColor: effectColor, saturationDeltaFactor: -1, maskImage: null);
         }
 
-        public unsafe static UIImage ApplyBlur (UIImage image, float blurRadius, UIColor tintColor, float saturationDeltaFactor, UIImage maskImage)
+        public unsafe static UIImage ApplyBlur (this UIImage image, float blurRadius, UIColor tintColor, float saturationDeltaFactor, UIImage maskImage)
         {
             if (image.Size.Width < 1 || image.Size.Height < 1) {
                 Debug.WriteLine (@"*** error: invalid size: ({0} x {1}). Both dimensions must be >= 1: {2}", image.Size.Width, image.Size.Height, image);
