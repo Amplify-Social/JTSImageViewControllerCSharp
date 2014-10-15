@@ -6,6 +6,9 @@ using System.Drawing;
 using MonoTouch.CoreGraphics;
 using MonoTouch.Foundation;
 using MonoTouch.CoreAnimation;
+using System.Threading.Tasks;
+using System.Threading;
+using SDWebImage;
 
 namespace JTSImageViewController
 {
@@ -143,10 +146,9 @@ namespace JTSImageViewController
         // Public Methods
         public void ShowFromViewController(UIViewController viewController, JTSImageViewControllerTransition transition) 
         {
-            // self.setTransition = transition // where is he getting this setTransition method?
+
             this.Transition = transition;
 
-            StartingInfo.StartingInterfaceOrientation = UIInterfaceOrientation.Portrait; // TEST CODE - DELETE LATER
             StartingInfo.StatusBarHiddenPriorToPresentation = UIApplication.SharedApplication.StatusBarHidden;
             StartingInfo.StatusBarStylePriorToPresentation = UIApplication.SharedApplication.StatusBarStyle;
 
@@ -394,12 +396,27 @@ namespace JTSImageViewController
             if (imageInfo.Image != null) {
                 Image = imageInfo.Image;
             } else {
-                // RUN TASK TO DOWNLOAD IMAGE HERE
-                Image = UIImage.FromBundle ("banecat.jpg");
-            }
-        }
+                Image = imageInfo.PlaceholderImage;
 
-        // TODO: COMPLETE THIS METHOD
+                // RUN TASK TO DOWNLOAD IMAGE HERE
+                SDWebImageDownloader.SharedDownloader.DownloadImage (
+                    url: imageInfo.ImageURL,
+                    options: SDWebImageDownloaderOptions.LowPriority,
+                    progressHandler: (receivedSize, expectedSize) => {
+                        //Console.WriteLine("Downloaded " + (float)receivedSize / (float)expectedSize + "%");
+                    },
+                    completedHandler: (image, data, error, finished) => {
+                        if (image != null && finished) {
+                            InvokeOnMainThread(() => {
+                                UpdateInterfaceWithImage(image);
+                            });
+                        }
+                    }
+                );
+            }
+
+        }
+            
         private void ViewDidLoadForImageMode() 
         {
             View.BackgroundColor = UIColor.Black;
@@ -457,6 +474,7 @@ namespace JTSImageViewController
             }
         }
 
+        // TODO: COMPLETE THIS METHOD LATER
         private void ViewDidLoadForAltTextMode()
         {
 
@@ -627,8 +645,9 @@ namespace JTSImageViewController
                         ScrollView.Frame = View.Bounds;
                     }
                     float scaling = JTSImageViewController.JTSImageViewController_MinimumBackgroundScaling;
-                    // SnapshotView.Transform = CGAffineTransform.CGRectApplyAffineTransform 
-
+                    SnapshotView.Transform = transform * CGAffineTransform.MakeScale (scaling, scaling);
+                } else {
+                    SnapshotView.Transform = transform;
                 }
             }
 
@@ -834,11 +853,14 @@ namespace JTSImageViewController
             CancelCurrentImageDrag (false);
             UpdateLayoutsForCurrentOrientation ();
             UpdateDimmingViewForCurrentZoomScale (false);
-            /*
-             *     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, duration * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
-                    _flags.isRotating = NO;
-                    });
-             */
+
+            InvokeInBackground(() => {
+                Thread.Sleep((int)(duration * 1000));
+                InvokeOnMainThread(() => {
+                        Flags.IsRotating = true;
+                    }
+                );
+            });
         }
 
         // Dismissal Methods
@@ -1019,14 +1041,14 @@ namespace JTSImageViewController
             ScrollView.ContentInset = targetInsets;
             ScrollView.ZoomToRect (targetZoomRect, true);
 
-            // MUST BE IMPLEMENTED
-            /*
-            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 0.35 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
-                [weakSelf.view setUserInteractionEnabled:YES];
-                _flags.scrollViewIsAnimatingAZoom = NO;
-            });
-            */
+            InvokeInBackground(() => {
+                Thread.Sleep((int)(0.35 * 1000));
 
+                InvokeOnMainThread(() => {
+                    this.View.UserInteractionEnabled = true;
+                    Flags.ScrollViewIsAnimatingAZoom = false;
+                });
+            });
         }
 
         private void ImageSingleTapped(NSObject sender) 
