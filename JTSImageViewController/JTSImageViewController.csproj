@@ -35,6 +35,9 @@
     <Reference Include="System.Xml" />
     <Reference Include="System.Core" />
     <Reference Include="monotouch" />
+    <Reference Include="SDWebImage">
+      <HintPath>..\Components\sdwebimage-3.7.1\lib\ios\SDWebImage.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Resources\" />
@@ -49,6 +52,13 @@
     <Compile Include="IJTSImageViewControllerAccessibilityDelegate.cs" />
     <Compile Include="IJTSImageViewControllerInteractionsDelegate.cs" />
     <Compile Include="IJTSImageViewControllerOptionsDelegate.cs" />
+    <Compile Include="JTSSimpleImageDownloader.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath)\Xamarin\iOS\Xamarin.MonoTouch.CSharp.targets" />
+  <ItemGroup>
+    <XamarinComponentReference Include="sdwebimage">
+      <Version>3.7.1</Version>
+      <Visible>False</Visible>
+    </XamarinComponentReference>
+  </ItemGroup>
 </Project>

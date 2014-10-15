@@ -33,7 +33,9 @@ namespace SampleProject
         public void CatImageButtonTapped(object sender, EventArgs e)
         {
             JTSImageInfo imageInfo = new JTSImageInfo ();
-            imageInfo.Image = UIImage.FromBundle ("banecat.jpg");
+            //imageInfo.Image = UIImage.FromBundle ("banecat.jpg");
+            imageInfo.PlaceholderImage = UIImage.FromBundle ("banecat.jpg");
+            imageInfo.ImageURL = new NSUrl ("http://www.phillipheath.com/images/homephotos-left/phil-heath-mr-olympia01.png");
             imageInfo.ReferenceRect = catImageButton.Frame;
             imageInfo.ReferenceView = catImageButton.Superview;
 
