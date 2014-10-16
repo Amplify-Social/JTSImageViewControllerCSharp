@@ -144,16 +144,19 @@ namespace JTSImageViewController
         }
 
         // Public Methods
-        public async void DownloadThenShowFromViewController(
+
+        public async Task DownloadThenShowFromViewController(
             UIViewController viewController, 
             JTSImageViewControllerTransition transition,
             UIView fromView,
+            CancellationToken cancel,
             int progressHeight = 0
         )
         {
             var spinner = new UIActivityIndicatorView (UIActivityIndicatorViewStyle.WhiteLarge) 
             { BackgroundColor = UIColor.Black.ColorWithAlpha (.5f) };
             spinner.Layer.CornerRadius = 5.0f;
+
             fromView.AddSubview (spinner);
             spinner.Frame = new RectangleF(
                 fromView.Frame.X,
@@ -166,6 +169,8 @@ namespace JTSImageViewController
             Image = await SetupImageAndDownloadIfNecessary (ImageInfo);
             spinner.StopAnimating ();
             spinner.RemoveFromSuperview ();
+            if (cancel.IsCancellationRequested)
+                return;
             ImageInfo.Image = Image;
             ShowFromViewController (viewController, transition);
             UpdateInterfaceWithImage (Image);
