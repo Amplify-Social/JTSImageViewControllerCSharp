@@ -130,9 +130,9 @@ namespace JTSImageViewController
             CurrentSnapshotRotationTransform = CGAffineTransform.MakeIdentity();
             Mode = imageMode;
             BackgroundStyle = backgroundStyle;
-            if (Mode == JTSImageViewControllerMode.Image) {
-                SetupImageAndDownloadIfNecessary (imageInfo);
-            }
+//            if (Mode == JTSImageViewControllerMode.Image) {
+//                SetupImageAndDownloadIfNecessary (imageInfo);
+//            }
 
             Flags = new JTSImageViewControllerFlags ();
             StartingInfo = new JTSImageViewControllerStartingInfo ();
@@ -144,7 +144,35 @@ namespace JTSImageViewController
         }
 
         // Public Methods
-        public void ShowFromViewController(UIViewController viewController, JTSImageViewControllerTransition transition) 
+        public async void DownloadThenShowFromViewController(
+            UIViewController viewController, 
+            JTSImageViewControllerTransition transition,
+            UIView fromView,
+            int progressHeight = 0
+        )
+        {
+            var spinner = new UIActivityIndicatorView (UIActivityIndicatorViewStyle.WhiteLarge) 
+            { BackgroundColor = UIColor.Black.ColorWithAlpha (.5f) };
+            spinner.Layer.CornerRadius = 5.0f;
+            fromView.AddSubview (spinner);
+            spinner.Frame = new RectangleF(
+                fromView.Frame.X,
+                fromView.Frame.Y,
+                fromView.Frame.Width,
+                progressHeight == 0 ? fromView.Frame.Height : progressHeight
+            );
+
+            spinner.StartAnimating ();
+            Image = await SetupImageAndDownloadIfNecessary (ImageInfo);
+            spinner.StopAnimating ();
+            spinner.RemoveFromSuperview ();
+            ImageInfo.Image = Image;
+            ShowFromViewController (viewController, transition);
+            UpdateInterfaceWithImage (Image);
+        }
+
+        public void ShowFromViewController(UIViewController viewController, 
+            JTSImageViewControllerTransition transition) 
         {
 
             this.Transition = transition;
@@ -420,30 +448,34 @@ namespace JTSImageViewController
         }
 
         // TODO: COMPLETE THIS METHOD LATER
-        private void SetupImageAndDownloadIfNecessary(JTSImageInfo imageInfo) 
+        private Task<UIImage> SetupImageAndDownloadIfNecessary(JTSImageInfo imageInfo) 
         {
+            var tcs = new TaskCompletionSource<UIImage> ();
+
             if (imageInfo.Image != null) {
-                Image = imageInfo.Image;
+                tcs.SetResult (imageInfo.Image);
+
             } else {
-                Image = imageInfo.PlaceholderImage;
+//                Image = imageInfo.PlaceholderImage;
+
+                RectangleF referenceFrameInWindow = ImageInfo.ReferenceView.ConvertRectToView (ImageInfo.ReferenceRect, null);
+                StartingInfo.StartingReferenceFrameForThumbnailInPresentingViewControllersOriginalOrientation = View.ConvertRectFromView (referenceFrameInWindow, null);
 
                 // RUN TASK TO DOWNLOAD IMAGE HERE
                 SDWebImageDownloader.SharedDownloader.DownloadImage (
                     url: imageInfo.ImageURL,
-                    options: SDWebImageDownloaderOptions.LowPriority,
+                    options: SDWebImageDownloaderOptions.HighPriority,
                     progressHandler: (receivedSize, expectedSize) => {
                         //Console.WriteLine("Downloaded " + (float)receivedSize / (float)expectedSize + "%");
                     },
                     completedHandler: (image, data, error, finished) => {
                         if (image != null && finished) {
-                            InvokeOnMainThread(() => {
-                                UpdateInterfaceWithImage(image);
-                            });
+                            tcs.SetResult(image);
                         }
                     }
                 );
             }
-
+            return tcs.Task;
         }
             
         private void ViewDidLoadForImageMode() 
