@@ -357,7 +357,7 @@ namespace JTSImageViewController
         {
             UIViewController presentingViewController = viewController.View.Window.RootViewController;
             while (presentingViewController.PresentedViewController != null)
-                presentingViewController = presentingViewController.PresentingViewController;
+                presentingViewController = presentingViewController.PresentedViewController;
             UIView snapShot = presentingViewController.View.SnapshotView (true);
             snapShot.ClipsToBounds = true;
             return snapShot;
