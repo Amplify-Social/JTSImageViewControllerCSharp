@@ -997,9 +997,9 @@ namespace JTSImageViewController
                     UIApplication.SharedApplication.SetStatusBarHidden(StartingInfo.StatusBarHiddenPriorToPresentation, UIStatusBarAnimation.Fade);
                 }
             }, () => {
-                // completion handler
-                // Needed if dismissing from a different orientation then the one we started with
-                // NEEDS TO BE IMPLEMENTED
+                PresentingViewController.DismissViewController(false, () => {
+                    DismissalDelegate.ImageViewerDidDismiss(this);
+                });
             });
 
 
