@@ -12,7 +12,7 @@ using SDWebImage;
 
 namespace JTSImageViewController
 {
-    public class JTSImageViewController : UIViewController, IUIScrollViewDelegate
+    public class JTSImageViewController : UIViewController, IUIScrollViewDelegate, IUIGestureRecognizerDelegate
     {
         // Enums
         public enum JTSImageViewControllerMode 
@@ -228,7 +228,73 @@ namespace JTSImageViewController
         // Private Methods
         private void ShowImageViewerByScalingDownFromOffscreenPositionWithViewController(UIViewController viewController)
         {
+            Flags.IsAnimatingAPresentationOrDismissal = true;
+            View.UserInteractionEnabled = false;
 
+            SnapshotView = SnapshotFromParentmostViewController (viewController);
+
+            if (BackgroundStyle == JTSImageViewControllerBackgroundStyle.ScaledDimmedBlurred) {
+                BlurredSnapshotView = BlurredSnapshotFromParentmostViewController (viewController);
+                SnapshotView.AddSubview (BlurredSnapshotView);
+                BlurredSnapshotView.Alpha = 0;
+            }
+
+            View.InsertSubview (SnapshotView, 0);
+            StartingInfo.StartingInterfaceOrientation = UIApplication.SharedApplication.StatusBarOrientation;
+            LastUsedOrientation = UIApplication.SharedApplication.StatusBarOrientation;
+
+            RectangleF referenceFrameInWindow = ImageInfo.ReferenceView.ConvertRectToView (ImageInfo.ReferenceRect, null);
+            StartingInfo.StartingReferenceFrameForThumbnailInPresentingViewControllersOriginalOrientation = View.ConvertRectFromView (referenceFrameInWindow, null);
+
+            ScrollView.AddSubview (ImageView);
+            viewController.PresentViewController (this, false, () => {
+                if (UIApplication.SharedApplication.StatusBarOrientation != StartingInfo.StartingInterfaceOrientation) {
+                    StartingInfo.PresentingViewControllerPresentedFromItsUnsupportedOrientation = true;
+                }
+
+                ScrollView.Alpha = 0;
+                ScrollView.Frame = View.Bounds;
+                UpdateScrollViewAndImageViewForCurrentMetrics();
+
+                float scaling = JTSImageViewController.JTSImageViewController_MaxScalingForExpandingOffscreenStyleTransition;
+                ScrollView.Transform = CGAffineTransform.MakeScale(scaling, scaling);
+
+                float duration = JTSImageViewController.JTSImageViewController_TransitionAnimationDuration;
+
+                // dispatch_async(dispatch_get_main_queue()
+                UIView.Animate(duration, 0, UIViewAnimationOptions.BeginFromCurrentState | UIViewAnimationOptions.CurveEaseInOut, () => {
+                    // animation
+                    Flags.IsTransitioningFromInitialModalToInteractiveState = true;
+
+                    UIApplication.SharedApplication.SetStatusBarHidden(true, UIStatusBarAnimation.Fade);
+                    float scaling_new = JTSImageViewController.JTSImageViewController_MinimumBackgroundScaling;
+
+                    // weakSelf.snapshotView.transform = CGAffineTransformConcat(weakSelf.snapshotView.transform, CGAffineTransformMakeScale(scaling, scaling));
+                    SnapshotView.Transform = SnapshotView.Transform * CGAffineTransform.MakeScale(scaling_new, scaling_new);
+
+                    if (BackgroundStyle == JTSImageViewControllerBackgroundStyle.ScaledDimmedBlurred)
+                        BlurredSnapshotView.Alpha = 1;
+
+                    AddMotionEffectsToSnapshotView();
+                    BlackBackdrop.Alpha = AlphaForBackgroundDimmingOverlay();
+
+                    ScrollView.Alpha = 1;
+                    ScrollView.Transform = CGAffineTransform.MakeIdentity();
+
+                    if (Image == null) 
+                        ProgressContainer.Alpha = 1;
+
+                }, () => {
+                    // completion handler
+                    Flags.IsTransitioningFromInitialModalToInteractiveState = false;
+                    Flags.IsAnimatingAPresentationOrDismissal = false;
+                    View.UserInteractionEnabled = true;
+                    Flags.IsPresented = true;
+
+                    if (Flags.ImageDownloadFailed)
+                        Dismiss(true);
+                });
+            });
         }
 
         private void ShowImageViewerByExpandingFromOriginalPositionFromViewController(UIViewController viewController)
@@ -1236,7 +1302,7 @@ namespace JTSImageViewController
             float actualArea = height * width;
             float referenceArea = view.Bounds.Size.Width * view.Bounds.Size.Height;
             float factor = referenceArea / actualArea;
-            float defaultResistance = 4.0f; 
+            float defaultResistance = 2.0f; // originally 4.0f
             float screenWidth = UIScreen.MainScreen.Bounds.Size.Width;
             float screenHeight = UIScreen.MainScreen.Bounds.Size.Height;
             float resistance = (float)(defaultResistance * ((320.0 * 480.0) / (screenWidth * screenHeight)));
@@ -1263,11 +1329,12 @@ namespace JTSImageViewController
         }
 
         // Gesture Recognizer Delegate Methods
+        [MonoTouch.Foundation.Export ("gestureRecognizer:shouldReceiveTouch:")]
         private bool GestureRecognizer(UIGestureRecognizer gestureRecognizer, UITouch touch) // COMPLETE
         {
             bool shouldReceiveTouch = true;
 
-            shouldReceiveTouch = !(InteractionDelegate.ImageViewerShouldTemporarilyIgnoreTouches (this));
+            // shouldReceiveTouch = !(InteractionDelegate.ImageViewerShouldTemporarilyIgnoreTouches (this));
             if (shouldReceiveTouch && gestureRecognizer == PanRecognizer) {
                 shouldReceiveTouch = (ScrollView.ZoomScale == 1 && Flags.ScrollViewIsAnimatingAZoom == false);
             }
