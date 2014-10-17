@@ -764,10 +764,12 @@ namespace JTSImageViewController
             }
 
             // TEST CODE BELOW - DELETE LATER
-            SnapshotView = new UIView ();
+            // SnapshotView = new UIView ();
             // TEST CODE ABOVE - DELETE LATER
 
-            SnapshotView.Center = new PointF (View.Bounds.Size.Width / 2.0f, View.Bounds.Size.Height / 2.0f);
+            if (SnapshotView != null) {
+                SnapshotView.Center = new PointF (View.Bounds.Size.Width / 2.0f, View.Bounds.Size.Height / 2.0f);
+            }
 
             if (Flags.RotationTransformIsDirty) {
                 Flags.RotationTransformIsDirty = false;
@@ -777,9 +779,14 @@ namespace JTSImageViewController
                         ScrollView.Frame = View.Bounds;
                     }
                     float scaling = JTSImageViewController.JTSImageViewController_MinimumBackgroundScaling;
-                    SnapshotView.Transform = transform * CGAffineTransform.MakeScale (scaling, scaling);
+
+                    if (SnapshotView != null) {
+                        SnapshotView.Transform = transform * CGAffineTransform.MakeScale (scaling, scaling);
+                    }
                 } else {
-                    SnapshotView.Transform = transform;
+                    if (SnapshotView != null) {
+                        SnapshotView.Transform = transform;
+                    }
                 }
             }
 
