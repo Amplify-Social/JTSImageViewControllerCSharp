@@ -1087,22 +1087,21 @@ namespace JTSImageViewController
             UIView.Animate (duration, 0, UIViewAnimationOptions.BeginFromCurrentState | UIViewAnimationOptions.CurveEaseInOut, () => {
                 // animation
                 SnapshotView.Transform = CurrentSnapshotRotationTransform;
-                RemoveMotionEffectsFromSnapshotView();
+                RemoveMotionEffectsFromSnapshotView ();
                 BlackBackdrop.Alpha = 0;
-                if (BackgroundStyle == JTSImageViewControllerBackgroundStyle.ScaledDimmedBlurred) 
+                if (BackgroundStyle == JTSImageViewControllerBackgroundStyle.ScaledDimmedBlurred)
                     BlurredSnapshotView.Alpha = 0;
                 ScrollView.Alpha = 0;
 
                 // if ([UIApplication sharedApplication].jts_usesViewControllerBasedStatusBarAppearance) {
                 //     [weakSelf setNeedsStatusBarAppearanceUpdate];
                 // } else {
-                UIApplication.SharedApplication.SetStatusBarHidden(StartingInfo.StatusBarHiddenPriorToPresentation, UIStatusBarAnimation.Fade);
+                UIApplication.SharedApplication.SetStatusBarHidden (StartingInfo.StatusBarHiddenPriorToPresentation, UIStatusBarAnimation.Fade);
 
-            }, () => {
-                // completion handler
-                PresentingViewController.DismissViewController(false, () => {
-                    DismissalDelegate.ImageViewerDidDismiss(this);
-                });
+            }, null);
+
+            PresentingViewController.DismissViewController(false, () => {
+                DismissalDelegate.ImageViewerDidDismiss(this);
             });
         }
 
@@ -1123,7 +1122,7 @@ namespace JTSImageViewController
             Flags.ImageIsFlickingAwayForDismissal = true;
             UIPushBehavior push = new UIPushBehavior (new IUIDynamicItem[] { ImageView }, UIPushBehaviorMode.Instantaneous);
 
-            push.PushDirection = new CGVector ((float)(velocity.X * 0.075), (float)(velocity.Y * 0.075));
+            push.PushDirection = new CGVector ((float)(velocity.X * 0.12), (float)(velocity.Y * 0.12));
             push.SetTargetOffset (ImageDragOffsetFromImageCenter, ImageView);
             push.Action = () => {
                 if (ImageViewIsOffscreen()) {
