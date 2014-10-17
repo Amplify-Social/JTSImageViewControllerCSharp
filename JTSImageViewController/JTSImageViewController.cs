@@ -1094,22 +1094,21 @@ namespace JTSImageViewController
             UIView.Animate (duration, 0, UIViewAnimationOptions.BeginFromCurrentState | UIViewAnimationOptions.CurveEaseInOut, () => {
                 // animation
                 SnapshotView.Transform = CurrentSnapshotRotationTransform;
-                RemoveMotionEffectsFromSnapshotView();
+                RemoveMotionEffectsFromSnapshotView ();
                 BlackBackdrop.Alpha = 0;
-                if (BackgroundStyle == JTSImageViewControllerBackgroundStyle.ScaledDimmedBlurred) 
+                if (BackgroundStyle == JTSImageViewControllerBackgroundStyle.ScaledDimmedBlurred)
                     BlurredSnapshotView.Alpha = 0;
                 ScrollView.Alpha = 0;
 
                 // if ([UIApplication sharedApplication].jts_usesViewControllerBasedStatusBarAppearance) {
                 //     [weakSelf setNeedsStatusBarAppearanceUpdate];
                 // } else {
-                UIApplication.SharedApplication.SetStatusBarHidden(StartingInfo.StatusBarHiddenPriorToPresentation, UIStatusBarAnimation.Fade);
+                UIApplication.SharedApplication.SetStatusBarHidden (StartingInfo.StatusBarHiddenPriorToPresentation, UIStatusBarAnimation.Fade);
 
-            }, () => {
-                // completion handler
-                PresentingViewController.DismissViewController(false, () => {
-                    DismissalDelegate.ImageViewerDidDismiss(this);
-                });
+            }, null);
+
+            PresentingViewController.DismissViewController(false, () => {
+                DismissalDelegate.ImageViewerDidDismiss(this);
             });
         }
 
@@ -1130,7 +1129,7 @@ namespace JTSImageViewController
             Flags.ImageIsFlickingAwayForDismissal = true;
             UIPushBehavior push = new UIPushBehavior (new IUIDynamicItem[] { ImageView }, UIPushBehaviorMode.Instantaneous);
 
-            push.PushDirection = new CGVector ((float)(velocity.X * 0.05), (float)(velocity.Y * 0.05));
+            push.PushDirection = new CGVector ((float)(velocity.X * 0.12), (float)(velocity.Y * 0.12));
             push.SetTargetOffset (ImageDragOffsetFromImageCenter, ImageView);
             push.Action = () => {
                 if (ImageViewIsOffscreen()) {
@@ -1289,7 +1288,7 @@ namespace JTSImageViewController
                 ImageView.Transform = CGAffineTransform.MakeIdentity ();
                 ImageView.Center = new PointF (ScrollView.ContentSize.Width / 2.0f, ScrollView.ContentSize.Height / 2.0f);
             } else {
-                UIView.Animate (0.7, 0, UIViewAnimationOptions.AllowAnimatedContent | UIViewAnimationOptions.BeginFromCurrentState, () => {
+                UIView.AnimateNotify (0.5, 0, 0.55f, 0.7f, UIViewAnimationOptions.AllowAnimatedContent | UIViewAnimationOptions.BeginFromCurrentState, () => {
                     // animation
                     if (Flags.IsDraggingImage == false) {
                         ImageView.Transform = CGAffineTransform.MakeIdentity();
