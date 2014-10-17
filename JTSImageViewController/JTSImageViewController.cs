@@ -1057,7 +1057,7 @@ namespace JTSImageViewController
             Flags.ImageIsFlickingAwayForDismissal = true;
             UIPushBehavior push = new UIPushBehavior (new IUIDynamicItem[] { ImageView }, UIPushBehaviorMode.Instantaneous);
 
-            push.PushDirection = new CGVector ((float)(velocity.X * 0.05), (float)(velocity.Y * 0.05));
+            push.PushDirection = new CGVector ((float)(velocity.X * 0.075), (float)(velocity.Y * 0.075));
             push.SetTargetOffset (ImageDragOffsetFromImageCenter, ImageView);
             push.Action = () => {
                 if (ImageViewIsOffscreen()) {
@@ -1216,7 +1216,7 @@ namespace JTSImageViewController
                 ImageView.Transform = CGAffineTransform.MakeIdentity ();
                 ImageView.Center = new PointF (ScrollView.ContentSize.Width / 2.0f, ScrollView.ContentSize.Height / 2.0f);
             } else {
-                UIView.Animate (0.7, 0, UIViewAnimationOptions.AllowAnimatedContent | UIViewAnimationOptions.BeginFromCurrentState, () => {
+                UIView.AnimateNotify (0.5, 0, 0.55f, 0.7f, UIViewAnimationOptions.AllowAnimatedContent | UIViewAnimationOptions.BeginFromCurrentState, () => {
                     // animation
                     if (Flags.IsDraggingImage == false) {
                         ImageView.Transform = CGAffineTransform.MakeIdentity();
