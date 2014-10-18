@@ -577,6 +577,7 @@ namespace JTSImageViewController
             ImageView.UserInteractionEnabled = true;
             ImageView.IsAccessibilityElement = false;
             ImageView.ClipsToBounds = true;
+            ImageView.Layer.AllowsEdgeAntialiasing = true;
 
             SetupImageModeGestureRecognizers ();
 
@@ -1089,28 +1090,29 @@ namespace JTSImageViewController
             Flags.IsAnimatingAPresentationOrDismissal = true;
             Flags.IsDismissing = true;
 
-            float duration = JTSImageViewController.JTSImageViewController_TransitionAnimationDuration;
 
+            float duration = JTSImageViewController.JTSImageViewController_TransitionAnimationDuration;
             UIView.Animate (duration, 0, UIViewAnimationOptions.BeginFromCurrentState | UIViewAnimationOptions.CurveEaseInOut, () => {
                 // animation
                 SnapshotView.Transform = CurrentSnapshotRotationTransform;
-                RemoveMotionEffectsFromSnapshotView ();
+                RemoveMotionEffectsFromSnapshotView();
                 BlackBackdrop.Alpha = 0;
+
                 if (BackgroundStyle == JTSImageViewControllerBackgroundStyle.ScaledDimmedBlurred)
                     BlurredSnapshotView.Alpha = 0;
-                ScrollView.Alpha = 0;
 
-                // if ([UIApplication sharedApplication].jts_usesViewControllerBasedStatusBarAppearance) {
-                //     [weakSelf setNeedsStatusBarAppearanceUpdate];
-                // } else {
-                UIApplication.SharedApplication.SetStatusBarHidden (StartingInfo.StatusBarHiddenPriorToPresentation, UIStatusBarAnimation.Fade);
+                // Rotation not needed, so fade the status bar back in. Looks nicer.
+                UIApplication.SharedApplication.SetStatusBarHidden(StartingInfo.StatusBarHiddenPriorToPresentation, UIStatusBarAnimation.Fade);
 
-            }, null);
-
-            PresentingViewController.DismissViewController(false, () => {
-                DismissalDelegate.ImageViewerDidDismiss(this);
+            }, () => {
+                PresentingViewController.DismissViewController(false, () => {
+                    DismissalDelegate.ImageViewerDidDismiss(this);
+                });
             });
+
         }
+
+
 
         private void DismissByExpandingImageToOffscreenPosition()
         {
