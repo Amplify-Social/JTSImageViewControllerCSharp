@@ -150,25 +150,40 @@ namespace JTSImageViewController
             JTSImageViewControllerTransition transition,
             UIView fromView,
             CancellationToken cancel,
-            int progressHeight = 0
+            int progressHeight = 0,
+            UIActivityIndicatorView spinner = null
         )
         {
-            var spinner = new UIActivityIndicatorView (UIActivityIndicatorViewStyle.WhiteLarge) 
-            { BackgroundColor = UIColor.Black.ColorWithAlpha (.5f) };
-            spinner.Layer.CornerRadius = 5.0f;
+            bool newSpinner = false;
+            if (spinner == null)
+            {
+                newSpinner = true;
+                spinner = new UIActivityIndicatorView (UIActivityIndicatorViewStyle.WhiteLarge) 
+                { BackgroundColor = UIColor.Black.ColorWithAlpha (.5f) };
+                spinner.Layer.CornerRadius = 5.0f;
 
-            fromView.AddSubview (spinner);
-            spinner.Frame = new RectangleF(
-                fromView.Frame.X,
-                fromView.Frame.Y,
-                fromView.Frame.Width,
-                progressHeight == 0 ? fromView.Frame.Height : progressHeight
-            );
+                fromView.AddSubview (spinner);
+                spinner.Frame = new RectangleF(
+                    fromView.Frame.X,
+                    fromView.Frame.Y,
+                    fromView.Frame.Width,
+                    progressHeight == 0 ? fromView.Frame.Height : progressHeight
+                );
+
+
+            }
 
             spinner.StartAnimating ();
+            spinner.Hidden = false;
             Image = await SetupImageAndDownloadIfNecessary (ImageInfo);
             spinner.StopAnimating ();
-            spinner.RemoveFromSuperview ();
+            spinner.Hidden = true;
+
+            if (newSpinner)
+            {
+                spinner.RemoveFromSuperview ();
+            }
+
             if (cancel.IsCancellationRequested)
                 return;
             ImageInfo.Image = Image;
