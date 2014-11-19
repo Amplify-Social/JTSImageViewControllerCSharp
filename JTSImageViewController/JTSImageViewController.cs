@@ -319,6 +319,10 @@ namespace JTSImageViewController
 
             SnapshotView = SnapshotFromParentmostViewController (viewController);
 
+            // The view is gone!? well guess we wont be showing any picture then.
+            if (SnapshotView == null)
+                return;
+           
             if (BackgroundStyle == JTSImageViewControllerBackgroundStyle.ScaledDimmedBlurred) {
                 BlurredSnapshotView = BlurredSnapshotFromParentmostViewController (viewController);
                 SnapshotView.AddSubview (BlurredSnapshotView);
@@ -436,7 +440,19 @@ namespace JTSImageViewController
         // Snapshots Methods
         private UIView SnapshotFromParentmostViewController(UIViewController viewController)
         {
-            UIViewController presentingViewController = viewController.View.Window.RootViewController;
+            if (viewController == null)
+                return null;
+
+            var window = viewController.View.Window;
+            if (window == null)
+                return null;
+
+            UIViewController presentingViewController = window.RootViewController;
+            // present viewcontroller is gone?! well gues we're done here then, return null, no image is shown
+            // this happes nwhen someone starts an image load on a view controller, navigates to a different vc.
+            if (presentingViewController == null)
+                return null;
+
             while (presentingViewController.PresentedViewController != null)
                 presentingViewController = presentingViewController.PresentedViewController;
             UIView snapShot = presentingViewController.View.SnapshotView (true);
