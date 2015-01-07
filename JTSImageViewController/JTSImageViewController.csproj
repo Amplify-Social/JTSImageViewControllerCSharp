@@ -20,6 +20,8 @@
     <WarningLevel>4</WarningLevel>
     <ConsolePause>false</ConsolePause>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <MtouchDebug>true</MtouchDebug>
+    <MtouchProfiling>true</MtouchProfiling>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>full</DebugType>
@@ -36,7 +38,7 @@
     <Reference Include="System.Core" />
     <Reference Include="monotouch" />
     <Reference Include="SDWebImage">
-      <HintPath>..\Components\sdwebimage-3.7.1\lib\ios\SDWebImage.dll</HintPath>
+      <HintPath>..\..\..\Components\sdwebimage-3.7.1\lib\ios\SDWebImage.dll</HintPath>
     </Reference>
   </ItemGroup>
   <ItemGroup>
